@@ -5,6 +5,8 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+- 한국어 README는 README.ko.md 참고
+
 ---
 
 ## Table of Contents
@@ -77,31 +79,31 @@ The AI Workflow Engine solves these by:
 
 ### Core Features
 
-| Feature | Description |
-|---------|-------------|
+| Feature                  | Description                                                       |
+| ------------------------ | ----------------------------------------------------------------- |
 | **Stage-Based Workflow** | Define stages (M0-M4, P1-P7) with checklists and transition rules |
-| **Enforced Transitions** | Cannot advance without completing all checklist items |
-| **Plugin System** | Extensible validators for custom conditions |
-| **State Persistence** | JSON-based state tracking across sessions |
-| **Audit Logging** | All actions are logged for accountability |
+| **Enforced Transitions** | Cannot advance without completing all checklist items             |
+| **Plugin System**        | Extensible validators for custom conditions                       |
+| **State Persistence**    | JSON-based state tracking across sessions                         |
+| **Audit Logging**        | All actions are logged for accountability                         |
 
 ### AI Integration Features
 
-| Feature | Description |
-|---------|-------------|
-| **Status Command** | AI can query current state at session start |
-| **USER-APPROVE** | Certain actions require human verification |
-| **Sub-Agent Reviews** | Record and track AI sub-agent reviews |
-| **Evidence Tracking** | Attach justifications to completed items |
+| Feature               | Description                                 |
+| --------------------- | ------------------------------------------- |
+| **Status Command**    | AI can query current state at session start |
+| **USER-APPROVE**      | Certain actions require human verification  |
+| **Sub-Agent Reviews** | Record and track AI sub-agent reviews       |
+| **Evidence Tracking** | Attach justifications to completed items    |
 
 ### Developer Experience
 
-| Feature | Description |
-|---------|-------------|
-| **Bilingual Support** | Full Korean/English i18n |
-| **Interactive Tutorial** | Built-in learning system |
-| **Shell Alias** | Easy `flow` command setup |
-| **YAML Configuration** | Human-readable workflow definitions |
+| Feature                  | Description                         |
+| ------------------------ | ----------------------------------- |
+| **Bilingual Support**    | Full Korean/English i18n            |
+| **Interactive Tutorial** | Built-in learning system            |
+| **Shell Alias**          | Easy `flow` command setup           |
+| **YAML Configuration**   | Human-readable workflow definitions |
 
 ---
 
@@ -296,10 +298,10 @@ plugins:
   shell: "workflow.plugins.shell.CommandValidator"
 
 # Path configuration (optional, all default to .workflow/)
-docs_dir: ".workflow/docs"              # Documentation directory
-audit_dir: ".workflow/audit"            # Audit log directory
-status_file: ".workflow/ACTIVE_STATUS.md"  # AI status hook file
-guide_file: ".workflow/docs/PROJECT_MANAGEMENT_GUIDE.md"  # Guide file
+docs_dir: ".workflow/docs" # Documentation directory
+audit_dir: ".workflow/audit" # Audit log directory
+status_file: ".workflow/ACTIVE_STATUS.md" # AI status hook file
+guide_file: ".workflow/docs/PROJECT_MANAGEMENT_GUIDE.md" # Guide file
 
 # Reusable condition sets (optional)
 rulesets:
@@ -317,30 +319,30 @@ rulesets:
 # Stage definitions (required)
 stages:
   M0:
-    id: "M0"                          # Unique identifier
-    label: "Tech Debt Review"         # Human-readable name
-    checklist:                        # Items to complete (string or object)
-      - "Review existing tech debt"   # Simple string (manual check)
+    id: "M0" # Unique identifier
+    label: "Tech Debt Review" # Human-readable name
+    checklist: # Items to complete (string or object)
+      - "Review existing tech debt" # Simple string (manual check)
       - "Prioritize debt items"
-      - "[USER-APPROVE] Approve debt plan"  # Requires token
+      - "[USER-APPROVE] Approve debt plan" # Requires token
 
       # Active Workflow: checklist item with auto-executed action
       - text: "Run linter"
-        action: "npm run lint"        # Executes on `flow check N`
+        action: "npm run lint" # Executes on `flow check N`
 
       # Action with required arguments
       - text: "Record progress"
-        action: "echo 'Progress: {args}'"  # {args} replaced by --args value
-        require_args: true            # Fails if --args not provided
+        action: "echo 'Progress: {args}'" # {args} replaced by --args value
+        require_args: true # Fails if --args not provided
 
-    transitions:                      # Where can we go from here?
+    transitions: # Where can we go from here?
       - target: "M1"
         conditions:
-          - use_ruleset: all_checked  # Reference a ruleset
-          - rule: fs                  # Or use a plugin directly
+          - use_ruleset: all_checked # Reference a ruleset
+          - rule: fs # Or use a plugin directly
             args:
               path: "docs/debt-plan.md"
-    on_enter:                         # Actions on stage entry (optional)
+    on_enter: # Actions on stage entry (optional)
       - action: "log"
         args:
           message: "Starting tech debt review"
@@ -380,8 +382,8 @@ stages:
 
 ### Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
+| Variable    | Description                   | Default       |
+| ----------- | ----------------------------- | ------------- |
 | `FLOW_LANG` | Display language (`en`, `ko`) | System locale |
 
 ---
@@ -501,6 +503,7 @@ flow review --agent "code-reviewer" --summary "All SOLID principles followed, no
 ### `flow secret-generate`
 
 Create a secret for USER-APPROVE items.
+** IMPORTANT !! ** : [USER-APPROVE] check, --force option requires secret token. If you send your secret by interactive shell running inside claude-cli or gemini-cli, secret token will be exposed to AI and then AI will bypass [USER-APPROVE] or --force option without your approve. you MUST send a secret token via additional terminal.
 
 ```bash
 flow secret-generate
@@ -565,27 +568,27 @@ The workflow engine supports two levels of stages:
 
 High-level project phases that span days to weeks:
 
-| Stage | Name | Purpose |
-|-------|------|---------|
-| M0 | Tech Debt Review | Assess and plan technical debt |
-| M1 | Milestone Planning | Create PRD, define scope |
-| M2 | Milestone Discussion | Architecture review, user approval |
-| M3 | Branch Creation | Git setup for the milestone |
-| M4 | Milestone Closing | Merge, document, celebrate |
+| Stage | Name                 | Purpose                            |
+| ----- | -------------------- | ---------------------------------- |
+| M0    | Tech Debt Review     | Assess and plan technical debt     |
+| M1    | Milestone Planning   | Create PRD, define scope           |
+| M2    | Milestone Discussion | Architecture review, user approval |
+| M3    | Branch Creation      | Git setup for the milestone        |
+| M4    | Milestone Closing    | Merge, document, celebrate         |
 
 #### Phase Stages (P1-P7)
 
 Detailed implementation steps within each milestone:
 
-| Stage | Name | Purpose |
-|-------|------|---------|
-| P1 | Phase Planning | Define specific deliverables |
-| P2 | Phase Discussion | Technical approach, user approval |
-| P3 | Spec | Write technical specification |
-| P4 | Implementation | Write the code |
-| P5 | Testing | Unit and integration tests |
-| P6 | Self-Review | Code quality check |
-| P7 | Phase Closing | Documentation sync, commit |
+| Stage | Name             | Purpose                           |
+| ----- | ---------------- | --------------------------------- |
+| P1    | Phase Planning   | Define specific deliverables      |
+| P2    | Phase Discussion | Technical approach, user approval |
+| P3    | Spec             | Write technical specification     |
+| P4    | Implementation   | Write the code                    |
+| P5    | Testing          | Unit and integration tests        |
+| P6    | Self-Review      | Code quality check                |
+| P7    | Phase Closing    | Documentation sync, commit        |
 
 ### Workflow Flow
 
@@ -634,11 +637,11 @@ checklist:
 
 **Checklist Item Types:**
 
-| Type | Syntax | Description |
-|------|--------|-------------|
-| Regular | `"Item text"` | AI can check freely |
-| User Approve | `"[USER-APPROVE] Text"` | Requires secret token |
-| Agent Review | `"[AGENT:name] Text"` | Requires sub-agent verification |
+| Type         | Syntax                  | Description                     |
+| ------------ | ----------------------- | ------------------------------- |
+| Regular      | `"Item text"`           | AI can check freely             |
+| User Approve | `"[USER-APPROVE] Text"` | Requires secret token           |
+| Agent Review | `"[AGENT:name] Text"`   | Requires sub-agent verification |
 
 ### Transitions
 
@@ -646,10 +649,10 @@ Transitions define how to move between stages:
 
 ```yaml
 transitions:
-  - target: "M1"                    # Where to go
-    conditions:                     # What must be true
-      - use_ruleset: all_checked    # Use predefined ruleset
-      - rule: fs                    # Use plugin validator
+  - target: "M1" # Where to go
+    conditions: # What must be true
+      - use_ruleset: all_checked # Use predefined ruleset
+      - rule: fs # Use plugin validator
         args:
           path: "docs/plan.md"
         fail_message: "Plan document must exist"
@@ -657,12 +660,12 @@ transitions:
 
 **Transition Rules:**
 
-| Rule | Description |
-|------|-------------|
-| `all_checked` | All checklist items must be checked |
+| Rule            | Description                              |
+| --------------- | ---------------------------------------- |
+| `all_checked`   | All checklist items must be checked      |
 | `user_approved` | USER-APPROVE items must have valid token |
-| `use_ruleset` | Apply a named ruleset |
-| Plugin rules | Custom validators (fs, shell, etc.) |
+| `use_ruleset`   | Apply a named ruleset                    |
+| Plugin rules    | Custom validators (fs, shell, etc.)      |
 
 ### Plugins
 
@@ -678,8 +681,8 @@ plugins:
 conditions:
   - rule: fs
     args:
-      path: "src/main.py"      # File to check
-      not_empty: true          # Must have content (optional)
+      path: "src/main.py" # File to check
+      not_empty: true # Must have content (optional)
 ```
 
 #### CommandValidator
@@ -692,8 +695,8 @@ plugins:
 conditions:
   - rule: shell
     args:
-      cmd: "pytest tests/"     # Command to run
-      expect_code: 0           # Expected exit code (default: 0)
+      cmd: "pytest tests/" # Command to run
+      expect_code: 0 # Expected exit code (default: 0)
 ```
 
 ---
@@ -725,24 +728,26 @@ flow tutorial
 
 ### Tutorial Contents
 
-| Section | Topics Covered |
-|---------|----------------|
-| 0. Introduction | What is workflow-tool, key concepts, quick start |
-| 1. Installation | pip install, shell alias, initial configuration |
-| 2. Basic Commands | status, check, next, set - with examples |
-| 3. Security | USER-APPROVE, secret generation, audit trail |
-| 4. Advanced | Custom plugins, rulesets, variables, hooks |
-| 5. Best Practices | Design tips, daily workflow, AI collaboration |
+| Section           | Topics Covered                                   |
+| ----------------- | ------------------------------------------------ |
+| 0. Introduction   | What is workflow-tool, key concepts, quick start |
+| 1. Installation   | pip install, shell alias, initial configuration  |
+| 2. Basic Commands | status, check, next, set - with examples         |
+| 3. Security       | USER-APPROVE, secret generation, audit trail     |
+| 4. Advanced       | Custom plugins, rulesets, variables, hooks       |
+| 5. Best Practices | Design tips, daily workflow, AI collaboration    |
 
 ### Learning Path
 
 **For New Users:**
+
 1. Run `flow tutorial` to start interactive tutorial
 2. Follow sections 0-2 for basics
 3. Create a simple workflow for practice
 4. Advance to sections 3-5
 
 **For Experienced Users:**
+
 1. Check `flow tutorial --section 4` for advanced features
 2. Review examples in `examples/` directory
 3. Create custom plugins for your needs
@@ -812,7 +817,7 @@ stages:
 
       # Action with required arguments
       - text: "Git commit"
-        action: "git add . && git commit -m \"${args}\""
+        action: 'git add . && git commit -m "${args}"'
         require_args: true
 
       # Action with context variables
@@ -829,12 +834,12 @@ stages:
 
 Actions can use these built-in variables that are automatically substituted:
 
-| Variable | Description | Example Value |
-|----------|-------------|---------------|
-| `${python}` | Current Python interpreter (venv-aware) | `/path/to/.venv/bin/python` |
-| `${python_exe}` | Alias for `${python}` | `/path/to/.venv/bin/python` |
-| `${cwd}` | Current working directory | `/path/to/project` |
-| `${args}` | CLI `--args` value (when provided) | `feat: add login` |
+| Variable        | Description                             | Example Value               |
+| --------------- | --------------------------------------- | --------------------------- |
+| `${python}`     | Current Python interpreter (venv-aware) | `/path/to/.venv/bin/python` |
+| `${python_exe}` | Alias for `${python}`                   | `/path/to/.venv/bin/python` |
+| `${cwd}`        | Current working directory               | `/path/to/project`          |
+| `${args}`       | CLI `--args` value (when provided)      | `feat: add login`           |
 
 Context variables from `workflow.yaml` (e.g., `${active_module}`) are also available. Nested variables are supported (e.g., `${test_cmd}` containing `${python}`).
 
@@ -870,12 +875,12 @@ flow check 2 --skip-action
 
 **Benefits:**
 
-| Before (Passive) | After (Active) |
-|------------------|----------------|
+| Before (Passive)      | After (Active)                 |
+| --------------------- | ------------------------------ |
 | AI marks item as done | AI must run the actual command |
-| No verification | Command must succeed (exit 0) |
-| Easy to skip | Enforced execution |
-| Manual audit | Automatic audit trail |
+| No verification       | Command must succeed (exit 0)  |
+| Easy to skip          | Enforced execution             |
+| Manual audit          | Automatic audit trail          |
 
 ### Creating Custom Plugins
 
@@ -996,6 +1001,7 @@ Instruct your AI assistant to follow the workflow:
 ## AI Instructions
 
 Before starting any task:
+
 1. Run `flow status` to check current stage
 2. Follow the checklist items in order
 3. Check off items as you complete them: `flow check N`
@@ -1003,6 +1009,7 @@ Before starting any task:
 5. Use `flow next` to advance when ready
 
 For USER-APPROVE items:
+
 - Ask the human to run `flow check N --token "..."`
 - Wait for confirmation before proceeding
 ```
@@ -1028,9 +1035,9 @@ organization/
 
 ### Supported Languages
 
-| Code | Language | Status |
-|------|----------|--------|
-| `en` | English | Full support |
+| Code | Language        | Status       |
+| ---- | --------------- | ------------ |
+| `en` | English         | Full support |
 | `ko` | Korean (한국어) | Full support |
 
 ### Setting Language
