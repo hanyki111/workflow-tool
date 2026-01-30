@@ -321,10 +321,20 @@ stages:
   M0:
     id: "M0"                          # 고유 식별자
     label: "기술 부채 검토"            # 사람이 읽을 수 있는 이름
-    checklist:                        # 완료할 항목들
-      - "기존 기술 부채 검토"
+    checklist:                        # 완료할 항목 (문자열 또는 객체)
+      - "기존 기술 부채 검토"          # 단순 문자열 (수동 체크)
       - "부채 항목 우선순위 결정"
       - "[USER-APPROVE] 부채 계획 승인"  # 토큰 필요
+
+      # Active Workflow: 액션이 자동 실행되는 체크리스트 항목
+      - text: "린터 실행"
+        action: "npm run lint"        # `flow check N` 시 실행
+
+      # 인자가 필요한 액션
+      - text: "진행 기록"
+        action: "echo '진행: {args}'"  # {args}가 --args 값으로 대체
+        require_args: true            # --args 없으면 실패
+
     transitions:                      # 여기서 어디로 갈 수 있나?
       - target: "M1"
         conditions:
@@ -377,7 +387,7 @@ flow status --oneline
 
 ### `flow check`
 
-체크리스트 항목을 완료로 표시.
+체크리스트 항목을 완료로 표시. 항목에 `action`이 정의되어 있으면 자동으로 실행됩니다.
 
 ```bash
 # 단일 항목 체크 (1부터 시작하는 인덱스)
@@ -394,6 +404,27 @@ flow check 3 --token "your-secret-phrase"
 
 # 둘 다 함께
 flow check 3 --token "secret" --evidence "@alice의 보안 검토 후 승인"
+
+# 액션에 인자 전달 (require_args: true인 항목용)
+flow check 5 --args "feat(auth): 로그인 검증 추가"
+```
+
+**Active Workflow (액션 자동 실행):**
+
+체크리스트 항목에 `action` 필드가 있으면 명령어가 자동으로 실행됩니다:
+
+```bash
+$ flow check 1
+✅ Action executed: npm run lint
+   Output: 모든 파일 린트 통과
+Checked: 린터 실행
+```
+
+액션이 실패하면 (0이 아닌 종료 코드) 항목이 체크되지 않습니다:
+
+```bash
+$ flow check 2
+❌ Action failed for item 2: 테스트 3개 실패
 ```
 
 ### `flow next`
@@ -905,6 +936,65 @@ flow status
 ---
 
 ## 고급 사용법
+
+### Active Workflow (액션 자동 실행)
+
+체크리스트를 수동 체크박스에서 능동적인 태스크 러너로 전환합니다. 액션이 연결된 항목을 체크하면 명령어가 자동으로 실행됩니다.
+
+**설정:**
+
+```yaml
+stages:
+  P7:
+    label: "Phase Closing"
+    checklist:
+      # 단순 문자열 (수동 체크, 기존 방식)
+      - "코드 품질 검토"
+
+      # 액션 항목 (체크 시 자동 실행)
+      - text: "테스트 실행"
+        action: "pytest -v"
+
+      # 인자가 필요한 액션
+      - text: "Git 커밋"
+        action: "git add . && git commit -m '{args}'"
+        require_args: true
+
+      # 컨텍스트 변수 사용
+      - text: "모듈 상태 업데이트"
+        action: "python -m memory_tool update ${active_module}"
+```
+
+**사용법:**
+
+```bash
+# 단순 항목 - 완료로 표시만
+flow check 1
+
+# 액션 항목 - 명령어 실행 후 성공 시 완료 표시
+flow check 2
+# ✅ Action executed: pytest -v
+#    Output: 15 passed in 2.34s
+# Checked: 테스트 실행
+
+# 인자가 필요한 항목
+flow check 3 --args "feat(auth): 로그인 검증 추가"
+# ✅ Action executed: git add . && git commit -m 'feat(auth): 로그인 검증 추가'
+# Checked: Git 커밋
+
+# 액션 실패 시 항목이 체크되지 않음
+flow check 2
+# ❌ Action failed for item 2: 테스트 3개 실패
+```
+
+**장점:**
+
+| 이전 (수동) | 이후 (능동) |
+|------------|------------|
+| AI가 완료로 표시만 함 | AI가 실제 명령을 실행해야 함 |
+| 검증 없음 | 명령 성공 필수 (exit 0) |
+| 건너뛰기 쉬움 | 강제 실행 |
+| 수동 감사 | 자동 감사 추적 |
 
 ### 커스텀 플러그인 만들기
 

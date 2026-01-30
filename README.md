@@ -319,10 +319,20 @@ stages:
   M0:
     id: "M0"                          # Unique identifier
     label: "Tech Debt Review"         # Human-readable name
-    checklist:                        # Items to complete
-      - "Review existing tech debt"
+    checklist:                        # Items to complete (string or object)
+      - "Review existing tech debt"   # Simple string (manual check)
       - "Prioritize debt items"
       - "[USER-APPROVE] Approve debt plan"  # Requires token
+
+      # Active Workflow: checklist item with auto-executed action
+      - text: "Run linter"
+        action: "npm run lint"        # Executes on `flow check N`
+
+      # Action with required arguments
+      - text: "Record progress"
+        action: "echo 'Progress: {args}'"  # {args} replaced by --args value
+        require_args: true            # Fails if --args not provided
+
     transitions:                      # Where can we go from here?
       - target: "M1"
         conditions:
@@ -402,7 +412,7 @@ flow status --oneline
 
 ### `flow check`
 
-Mark checklist items as completed.
+Mark checklist items as completed. If the item has an `action` defined, it will be executed automatically.
 
 ```bash
 # Check single item (1-based index)
@@ -419,6 +429,27 @@ flow check 3 --token "your-secret-phrase"
 
 # Check with both
 flow check 3 --token "secret" --evidence "Approved by @alice after security review"
+
+# Pass arguments to action (for items with require_args: true)
+flow check 5 --args "feat(auth): add login validation"
+```
+
+**Active Workflow (Action Execution):**
+
+When a checklist item has an `action` field, the command is executed automatically:
+
+```bash
+$ flow check 1
+✅ Action executed: npm run lint
+   Output: All files passed linting
+Checked: Run linter
+```
+
+If the action fails (non-zero exit code), the item is NOT marked as checked:
+
+```bash
+$ flow check 2
+❌ Action failed for item 2: Tests failed with 3 errors
 ```
 
 ### `flow next`
@@ -760,6 +791,65 @@ See `examples/README.md` for detailed documentation of each example.
 ---
 
 ## Advanced Usage
+
+### Active Workflow (Auto-Execute Actions)
+
+Transform your checklist from passive checkboxes into an active task runner. When you check an item with an associated action, the command executes automatically.
+
+**Configuration:**
+
+```yaml
+stages:
+  P7:
+    label: "Phase Closing"
+    checklist:
+      # Simple string (manual check, as usual)
+      - "Review code quality"
+
+      # Action item (auto-executed on check)
+      - text: "Run tests"
+        action: "pytest -v"
+
+      # Action with required arguments
+      - text: "Git commit"
+        action: "git add . && git commit -m '{args}'"
+        require_args: true
+
+      # Action with context variables
+      - text: "Update module status"
+        action: "python -m memory_tool update ${active_module}"
+```
+
+**Usage:**
+
+```bash
+# Simple item - just marks as done
+flow check 1
+
+# Action item - executes command, then marks as done (if successful)
+flow check 2
+# ✅ Action executed: pytest -v
+#    Output: 15 passed in 2.34s
+# Checked: Run tests
+
+# Item requiring arguments
+flow check 3 --args "feat(auth): add login validation"
+# ✅ Action executed: git add . && git commit -m 'feat(auth): add login validation'
+# Checked: Git commit
+
+# If action fails, item is NOT checked
+flow check 2
+# ❌ Action failed for item 2: 3 tests failed
+```
+
+**Benefits:**
+
+| Before (Passive) | After (Active) |
+|------------------|----------------|
+| AI marks item as done | AI must run the actual command |
+| No verification | Command must succeed (exit 0) |
+| Easy to skip | Enforced execution |
+| Manual audit | Automatic audit trail |
 
 ### Creating Custom Plugins
 

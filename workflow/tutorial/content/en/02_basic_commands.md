@@ -43,6 +43,27 @@ flow check 1 2 3
 
 # Add evidence/justification
 flow check 1 --evidence "Reviewed all modules, no critical debt found"
+
+# Pass arguments to action commands
+flow check 5 --args "feat: add user authentication"
+```
+
+### Active Workflow (Action Execution)
+
+If a checklist item has an `action` defined in workflow.yaml, it executes automatically:
+
+```bash
+$ flow check 1
+✅ Action executed: pytest -v
+   Output: 15 passed in 2.34s
+Checked: Run tests
+```
+
+If the action fails, the item is NOT marked as checked:
+
+```bash
+$ flow check 1
+❌ Action failed for item 1: Command failed with exit code 1
 ```
 
 ## Next Command

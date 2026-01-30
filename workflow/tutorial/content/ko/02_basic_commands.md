@@ -43,6 +43,27 @@ flow check 1 2 3
 
 # 증거/근거 추가
 flow check 1 --evidence "모든 모듈 검토 완료, 심각한 부채 없음"
+
+# 액션 명령어에 인자 전달
+flow check 5 --args "feat: 사용자 인증 추가"
+```
+
+### Active Workflow (액션 자동 실행)
+
+workflow.yaml에 `action`이 정의된 체크리스트 항목은 자동으로 실행됩니다:
+
+```bash
+$ flow check 1
+✅ Action executed: pytest -v
+   Output: 15 passed in 2.34s
+Checked: 테스트 실행
+```
+
+액션이 실패하면 항목이 체크되지 않습니다:
+
+```bash
+$ flow check 1
+❌ Action failed for item 1: 종료 코드 1로 명령 실패
 ```
 
 ## Next 명령어
