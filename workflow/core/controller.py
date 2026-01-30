@@ -129,6 +129,14 @@ class WorkflowController:
             # Get action config from stage definition (if available)
             item_config = self._get_item_config(stage_config, index - 1) if stage_config else None
 
+            # Extract required_agent from text if not already set (defensive check)
+            required_agent = item.required_agent
+            if not required_agent:
+                agent_match = re.search(r'\[AGENT:([\w-]+)\]', item.text)
+                if agent_match:
+                    required_agent = agent_match.group(1)
+                    item.required_agent = required_agent  # Update for future reference
+
             # 1. Authorization Check (SHA-256)
             if item.text.strip().startswith("[USER-APPROVE]"):
                 if not token:
@@ -139,9 +147,9 @@ class WorkflowController:
                     continue
 
             # 2. Agent Verification Check
-            if item.required_agent:
-                if not self._verify_agent_review(item.required_agent):
-                    results.append(f"❌ Error: Agent review from '{item.required_agent}' not found in logs for current stage.")
+            if required_agent:
+                if not self._verify_agent_review(required_agent):
+                    results.append(f"❌ Error: Agent review from '{required_agent}' not found in logs for current stage.")
                     continue
 
             # 3. Execute Action (if defined and not skipped)
