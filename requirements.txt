@@ -1,1 +1,4 @@
 PyYAML>=6.0
+
+# Development dependencies
+pytest>=8.0
