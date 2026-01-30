@@ -66,6 +66,8 @@ $ flow check 1
 ❌ Action failed for item 1: 종료 코드 1로 명령 실패
 ```
 
+**내장 변수:** 현재 Python 인터프리터에는 `${python}` (venv 인식), 작업 디렉토리에는 `${cwd}`를 사용하세요. 액션은 전체 쉘 환경을 상속받습니다.
+
 ## Next 명령어
 
 다음 스테이지로 전이:

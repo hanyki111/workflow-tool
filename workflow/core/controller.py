@@ -3,6 +3,7 @@ import os
 import re
 import json
 import subprocess
+import sys
 from datetime import datetime
 from .state import WorkflowState, CheckItem
 from .schema import WorkflowConfigV2, ChecklistItemConfig
@@ -188,17 +189,33 @@ class WorkflowController:
         if args:
             command = command.replace('{args}', args)
 
+        # Built-in variables
+        builtin_vars = {
+            'python': sys.executable,      # Current Python interpreter (venv-aware)
+            'python_exe': sys.executable,  # Alias
+            'cwd': os.getcwd(),            # Current working directory
+        }
+
+        # Substitute built-in variables first
+        for key, value in builtin_vars.items():
+            command = command.replace(f'${{{key}}}', str(value))
+
         # Substitute context variables
         for key, value in self.context.data.items():
             command = command.replace(f'${{{key}}}', str(value))
 
         try:
+            # Inherit current environment (including VIRTUAL_ENV, PATH, PYTHONPATH)
+            env = os.environ.copy()
+
             result = subprocess.run(
                 command,
                 shell=True,
                 capture_output=True,
                 text=True,
-                timeout=300  # 5 minute timeout
+                timeout=300,  # 5 minute timeout
+                env=env,      # Inherit environment variables
+                cwd=os.getcwd()  # Run from current directory
             )
 
             if result.returncode != 0:

@@ -962,8 +962,22 @@ stages:
 
       # 컨텍스트 변수 사용
       - text: "모듈 상태 업데이트"
-        action: "python -m memory_tool update ${active_module}"
+        action: "${python} -m memory_tool update ${active_module}"
 ```
+
+**내장 변수:**
+
+액션에서 자동으로 치환되는 내장 변수를 사용할 수 있습니다:
+
+| 변수 | 설명 | 예시 값 |
+|------|------|--------|
+| `${python}` | 현재 Python 인터프리터 (venv 인식) | `/path/to/.venv/bin/python` |
+| `${python_exe}` | `${python}`의 별칭 | `/path/to/.venv/bin/python` |
+| `${cwd}` | 현재 작업 디렉토리 | `/path/to/project` |
+
+`workflow.yaml`의 컨텍스트 변수(예: `${active_module}`)도 사용 가능합니다.
+
+> **참고:** 액션은 `PYTHONPATH`, `VIRTUAL_ENV`, `PATH`를 포함한 전체 쉘 환경을 상속받습니다. 이를 통해 명령어가 워크플로우 툴과 동일한 환경에서 실행됩니다.
 
 **사용법:**
 

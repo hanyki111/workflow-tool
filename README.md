@@ -817,8 +817,22 @@ stages:
 
       # Action with context variables
       - text: "Update module status"
-        action: "python -m memory_tool update ${active_module}"
+        action: "${python} -m memory_tool update ${active_module}"
 ```
+
+**Built-in Variables:**
+
+Actions can use these built-in variables that are automatically substituted:
+
+| Variable | Description | Example Value |
+|----------|-------------|---------------|
+| `${python}` | Current Python interpreter (venv-aware) | `/path/to/.venv/bin/python` |
+| `${python_exe}` | Alias for `${python}` | `/path/to/.venv/bin/python` |
+| `${cwd}` | Current working directory | `/path/to/project` |
+
+Context variables from `workflow.yaml` (e.g., `${active_module}`) are also available.
+
+> **Note:** Actions inherit the full shell environment including `PYTHONPATH`, `VIRTUAL_ENV`, and `PATH`. This ensures commands run in the same context as the workflow tool itself.
 
 **Usage:**
 

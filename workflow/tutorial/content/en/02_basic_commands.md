@@ -66,6 +66,8 @@ $ flow check 1
 ❌ Action failed for item 1: Command failed with exit code 1
 ```
 
+**Built-in variables:** Use `${python}` for the current Python interpreter (venv-aware), `${cwd}` for the working directory. Actions inherit the full shell environment.
+
 ## Next Command
 
 Transition to the next stage:
