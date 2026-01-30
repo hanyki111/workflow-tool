@@ -32,6 +32,8 @@ help:
     description: "현재 스테이지/모듈 수동 설정"
     stage: "스테이지 코드 (예: M1, P2)"
     module: "활성 모듈 이름 설정"
+    force: "미완료 항목이 있어도 스테이지 변경 (--token 필수)"
+    token: "USER-APPROVE 토큰 (--force 사용 시 필수)"
 
   review:
     description: "서브 에이전트 리뷰 기록"

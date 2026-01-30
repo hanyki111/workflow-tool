@@ -105,6 +105,15 @@ def main():
         "--module",
         help=t('help.set.module')
     )
+    set_parser.add_argument(
+        "--force",
+        action="store_true",
+        help=t('help.set.force')
+    )
+    set_parser.add_argument(
+        "--token",
+        help=t('help.set.token')
+    )
 
     # Review
     review_parser = subparsers.add_parser(
@@ -237,11 +246,7 @@ def main():
         elif args.command == "check":
             print(ctrl.check(args.indices, token=args.token, evidence=args.evidence, args=args.args, skip_action=args.skip_action))
         elif args.command == "set":
-            ctrl.state.current_stage = args.stage
-            if args.module:
-                ctrl.state.active_module = args.module
-            ctrl.state.save(ctrl.config.state_file)
-            print(ctrl.status())
+            print(ctrl.set_stage(args.stage, module=args.module, force=args.force, token=args.token))
         elif args.command == "review":
             print(ctrl.record_review(args.agent, args.summary))
         elif args.command == "secret-generate":

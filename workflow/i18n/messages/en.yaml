@@ -32,6 +32,8 @@ help:
     description: "Manually set current stage/module"
     stage: "Stage code (e.g., M1, P2)"
     module: "Set active module name"
+    force: "Force stage change even with unchecked items (requires --token)"
+    token: "USER-APPROVE token (required for --force)"
 
   review:
     description: "Record sub-agent review"

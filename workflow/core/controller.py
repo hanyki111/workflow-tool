@@ -349,6 +349,56 @@ class WorkflowController:
         prefix = "⚠️ [FORCED] " if force else "✅ "
         return f"{prefix}Transitioned to {transition.target}\n" + self.status()
 
+    def set_stage(self, stage: str, module: Optional[str] = None, force: bool = False, token: Optional[str] = None) -> str:
+        """Manually set the current stage. Requires --force if checklist has unchecked items."""
+        # Validate stage exists
+        if stage not in self.config.stages:
+            valid_stages = list(self.config.stages.keys())
+            return f"❌ Error: Invalid stage '{stage}'. Valid stages: {valid_stages}"
+
+        # Check for unchecked items in current checklist
+        unchecked = [i for i in self.state.checklist if not i.checked]
+        if unchecked:
+            if not force:
+                unchecked_texts = [f"  - {i.text}" for i in unchecked[:5]]
+                if len(unchecked) > 5:
+                    unchecked_texts.append(f"  ... and {len(unchecked) - 5} more")
+                return (
+                    f"❌ Cannot change stage: {len(unchecked)} unchecked items remain.\n"
+                    + "\n".join(unchecked_texts) + "\n\n"
+                    + "Use --force --token YOUR_TOKEN to override."
+                )
+            # Force requires token
+            if not token:
+                return "❌ Error: --force requires USER-APPROVE token. Use: flow set STAGE --force --token YOUR_TOKEN"
+            if not verify_token(token):
+                return "❌ Error: Invalid token for --force."
+
+        # Record audit log if forcing with unchecked items
+        if unchecked and force:
+            self.audit.logger.log_event("FORCED_SET_STAGE", {
+                "from_stage": self.state.current_stage,
+                "to_stage": stage,
+                "unchecked_count": len(unchecked),
+                "unchecked_items": [i.text for i in unchecked]
+            })
+
+        # Perform the stage change
+        from_stage = self.state.current_stage
+        self.state.current_stage = stage
+        self.state.checklist = []  # Clear checklist for new stage
+        if module:
+            self.state.active_module = module
+            self.context.update("active_module", module)
+        self.state.save(self.config.state_file)
+        self.engine.set_stage(stage)
+
+        prefix = "⚠️ [FORCED] " if (unchecked and force) else "✅ "
+        result = f"{prefix}Stage set to {stage}"
+        if module:
+            result += f" (module: {module})"
+        return result + "\n" + self.status()
+
     def _update_active_status_file(self, checklist_text: str, unchecked_indices: list = None):
         path = self.config.status_file
         content = f"> **[CURRENT WORKFLOW STATE]**\n"
