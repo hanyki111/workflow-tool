@@ -1,0 +1,109 @@
+# English message catalog for workflow-tool
+
+app:
+  name: "AI Workflow Engine"
+  description: "Workflow Management Tool"
+  version: "2.0.0"
+
+help:
+  main:
+    description: "Workflow Management Tool - AI-Native development workflow engine"
+
+  status:
+    description: "Show current stage and checklist"
+    oneline: "Print status in one line"
+
+  next:
+    description: "Move to next stage"
+    target: "Target stage code (e.g., M1, P2)"
+    force: "Force transition skipping rules"
+    reason: "Reason for forced transition"
+
+  check:
+    description: "Mark checklist items as done"
+    indices: "Item indices (1-based)"
+    token: "Secret token for USER-APPROVE items"
+    evidence: "Add audit evidence or justification"
+
+  set:
+    description: "Manually set current stage/module"
+    stage: "Stage code (e.g., M1, P2)"
+    module: "Set active module name"
+
+  review:
+    description: "Record sub-agent review"
+    agent: "Agent name (e.g., spec-validator)"
+    summary: "Summary of the review findings"
+
+  secret_generate:
+    description: "Interactively generate SHA-256 secret hash"
+
+  install_alias:
+    description: "Install shell alias"
+    name: "Alias name"
+
+  tutorial:
+    description: "Interactive tutorial and documentation"
+    list: "List all tutorial sections"
+    section: "Jump to specific section number"
+    section_name: "Section name to display"
+
+  lang:
+    description: "Set display language (en, ko)"
+
+commands:
+  status:
+    title: "Current Stage"
+    stage: "Stage"
+    module: "Active Module"
+    checklist: "Checklist"
+    no_checklist: "No checklist items"
+    progress: "{checked}/{total} items completed"
+
+  next:
+    success: "Transitioned to {stage}: {label}"
+    blocked: "Cannot transition: {reason}"
+    no_target: "No valid transition from current stage"
+    force_warning: "Forced transition (bypassing rules): {reason}"
+
+  check:
+    success: "Checked items: {items}"
+    invalid_index: "Invalid index: {index}"
+    already_checked: "Item {index} already checked"
+    requires_token: "Item {index} requires USER-APPROVE token"
+    invalid_token: "Invalid token for USER-APPROVE"
+
+  set:
+    success: "Set stage to {stage}"
+    invalid_stage: "Invalid stage: {stage}"
+
+  review:
+    success: "Recorded review from {agent}"
+    logged: "Review logged to audit file"
+
+  secret:
+    prompt: "Enter your secret phrase: "
+    confirm: "Confirm secret phrase: "
+    mismatch: "Secrets do not match. Please try again."
+    success: "Secret hash saved to {path}"
+    instruction: "Use this secret with --token flag for USER-APPROVE items"
+
+errors:
+  config_not_found: "Configuration file not found: {path}"
+  state_not_found: "State file not found, creating default"
+  invalid_yaml: "Invalid YAML in config file: {error}"
+  plugin_load_failed: "Failed to load plugin: {plugin}"
+  unknown_command: "Unknown command: {command}"
+
+tutorial:
+  title: "AI Workflow Engine Tutorial"
+  sections: "Available Sections"
+  section_prefix: "Section {num}"
+  navigation:
+    next: "[N]ext"
+    prev: "[P]revious"
+    quit: "[Q]uit"
+    menu: "[M]enu"
+  prompt: "Enter choice: "
+  completed: "Tutorial completed!"
+  section_not_found: "Section not found: {name}"

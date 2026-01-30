@@ -1,0 +1,33 @@
+guide_file: ".memory/docs/PROJECT_MANAGEMENT_GUIDE.md"
+state_file: ".workflow/state.json"
+
+hierarchy: ["milestone", "phase", "stage"]
+
+mappings:
+  M0: "Stage M0"
+  M1: "Stage M1"
+  M2: "Stage M2"
+  M3: "Stage M3"
+  M4: "Stage M4"
+  
+  P1: "Stage P1"
+  P2: "Stage P2"
+  P3: "Stage P3"
+  P4: "Stage P4"
+  P5: "Stage P5"
+  P6: "Stage P6"
+  P7: "Stage P7"
+
+sequence:
+  M0: ["M1"]
+  M1: ["M2"]
+  M2: ["M3"]
+  M3: ["P1"]
+  
+  P1: ["P2"]
+  P2: ["P3"]
+  P3: ["P4"]
+  P4: ["P5"]
+  P5: ["P6"]
+  P6: ["P7"]
+  P7: ["P1", "M4"]
