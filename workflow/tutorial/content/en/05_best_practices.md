@@ -129,6 +129,6 @@ python -c "from workflow.plugins.fs import FileExistsValidator"
 Congratulations! You've completed the workflow-tool tutorial.
 
 For more information:
-- Documentation: `.memory/docs/`
+- Documentation: `.workflow/docs/`
 - Configuration: `workflow.yaml`
 - Issues: https://github.com/workflow-tool/workflow-tool/issues

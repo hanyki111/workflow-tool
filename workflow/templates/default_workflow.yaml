@@ -1,4 +1,4 @@
-guide_file: ".memory/docs/PROJECT_MANAGEMENT_GUIDE.md"
+guide_file: ".workflow/docs/PROJECT_MANAGEMENT_GUIDE.md"
 state_file: ".workflow/state.json"
 
 hierarchy: ["milestone", "phase", "stage"]

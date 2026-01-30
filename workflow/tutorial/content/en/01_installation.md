@@ -91,10 +91,24 @@ After setup, your project should have:
 my-project/
 ├── workflow.yaml        # Workflow definition
 ├── .workflow/
-│   └── state.json       # Current state
-└── .memory/             # Project knowledge (optional)
-    └── docs/
-        └── PROJECT_MANAGEMENT_GUIDE.md
+│   ├── state.json       # Current state
+│   ├── docs/            # Workflow documentation
+│   │   └── PROJECT_MANAGEMENT_GUIDE.md
+│   ├── audit/           # Audit logs (auto-created)
+│   └── ACTIVE_STATUS.md # AI status hook (auto-created)
+└── CLAUDE.md            # AI instructions (optional)
+```
+
+## Path Configuration (Optional)
+
+Customize paths in workflow.yaml:
+
+```yaml
+# Default paths (all within .workflow/)
+docs_dir: ".workflow/docs"
+audit_dir: ".workflow/audit"
+status_file: ".workflow/ACTIVE_STATUS.md"
+guide_file: ".workflow/docs/PROJECT_MANAGEMENT_GUIDE.md"
 ```
 
 Next: Learn about basic commands!

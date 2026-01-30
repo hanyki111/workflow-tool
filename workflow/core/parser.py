@@ -77,13 +77,24 @@ class ConfigParserV2:
                 on_enter=s_data.get('on_enter', [])
             )
 
+        # Parse path configuration with sensible defaults
+        docs_dir = data.get('docs_dir', ".workflow/docs")
+        audit_dir = data.get('audit_dir', ".workflow/audit")
+        status_file = data.get('status_file', ".workflow/ACTIVE_STATUS.md")
+
+        # guide_file can be explicit or derived from docs_dir
+        guide_file = data.get('guide_file', f"{docs_dir}/PROJECT_MANAGEMENT_GUIDE.md")
+
         config = WorkflowConfigV2(
             version=str(data.get('version', '1.0')),
             variables=data.get('variables', {}),
             rulesets=rulesets,
             stages=stages,
             plugins=data.get('plugins', {}),
-            guide_file=data.get('guide_file', ".memory/docs/PROJECT_MANAGEMENT_GUIDE.md"),
+            docs_dir=docs_dir,
+            audit_dir=audit_dir,
+            status_file=status_file,
+            guide_file=guide_file,
             state_file=data.get('state_file', ".workflow/state.json"),
             secret_file=data.get('secret_file', ".workflow/secret")
         )

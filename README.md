@@ -268,14 +268,12 @@ my-project/
 ├── .workflow/
 │   ├── state.json          # Current state (auto-created)
 │   ├── secret              # Secret hash for USER-APPROVE (gitignored)
-│   └── audit.log           # Action audit log (gitignored)
-├── .memory/                # Project knowledge (optional)
-│   ├── docs/
+│   ├── audit/              # Action audit logs (gitignored)
+│   │   └── workflow.log
+│   ├── docs/               # Workflow documentation
 │   │   └── PROJECT_MANAGEMENT_GUIDE.md
-│   └── modules/
-│       └── [feature-name]/
-│           ├── spec.md
-│           └── current.md
+│   └── ACTIVE_STATUS.md    # AI status hook (auto-created, gitignored)
+├── CLAUDE.md               # AI agent instructions (optional)
 └── ... (your project files)
 ```
 
@@ -296,6 +294,12 @@ variables:
 plugins:
   fs: "workflow.plugins.fs.FileExistsValidator"
   shell: "workflow.plugins.shell.CommandValidator"
+
+# Path configuration (optional, all default to .workflow/)
+docs_dir: ".workflow/docs"              # Documentation directory
+audit_dir: ".workflow/audit"            # Audit log directory
+status_file: ".workflow/ACTIVE_STATUS.md"  # AI status hook file
+guide_file: ".workflow/docs/PROJECT_MANAGEMENT_GUIDE.md"  # Guide file
 
 # Reusable condition sets (optional)
 rulesets:
@@ -1023,7 +1027,7 @@ python -c "import yaml; yaml.safe_load(open('workflow.yaml'))"
 
 1. **Tutorial**: `flow tutorial`
 2. **Command Help**: `flow <command> --help`
-3. **Documentation**: `.memory/docs/`
+3. **Documentation**: `.workflow/docs/`
 4. **Issues**: https://github.com/your-org/workflow-tool/issues
 
 ---

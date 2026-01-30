@@ -210,5 +210,5 @@ stages:
 
 ## 관련 문서
 
-- [PROJECT_MANAGEMENT_GUIDE.md](../../.memory/docs/PROJECT_MANAGEMENT_GUIDE.md)
-- [ARCHITECTURE.md](../../.memory/docs/ARCHITECTURE.md)
+- [메인 README](../../README.ko.md) - 전체 문서
+- [튜토리얼](../../workflow/tutorial/) - 학습 자료

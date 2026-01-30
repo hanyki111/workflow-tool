@@ -289,7 +289,7 @@ WORKFLOW_INSTRUCTIONS_TEMPLATE = '''
 ### Setup (Add to top of CLAUDE.md)
 
 ```markdown
-@import .memory/ACTIVE_STATUS.md
+@import .workflow/ACTIVE_STATUS.md
 ```
 
 ### Every Turn
@@ -339,7 +339,7 @@ CLAUDE_MD_SNIPPET = '''
 # Workflow Tool Integration
 # ============================================================
 # Add this line at the TOP of your CLAUDE.md:
-#   @import .memory/ACTIVE_STATUS.md
+#   @import .workflow/ACTIVE_STATUS.md
 #
 # Add the section below to your CLAUDE.md:
 # ============================================================
@@ -581,11 +581,11 @@ def init_project(
         state_path.write_text(state_content, encoding='utf-8')
         results.append(f"✅ Created .workflow/state.json (stage: {initial_stage})")
 
-    # 3. Create .memory/docs/PROJECT_MANAGEMENT_GUIDE.md
+    # 3. Create .workflow/docs/PROJECT_MANAGEMENT_GUIDE.md
     if with_guide:
-        memory_docs = cwd / ".memory" / "docs"
-        memory_docs.mkdir(parents=True, exist_ok=True)
-        guide_path = memory_docs / "PROJECT_MANAGEMENT_GUIDE.md"
+        docs_dir = workflow_dir / "docs"
+        docs_dir.mkdir(parents=True, exist_ok=True)
+        guide_path = docs_dir / "PROJECT_MANAGEMENT_GUIDE.md"
 
         if guide_path.exists() and not force:
             results.append(f"⚠️  PROJECT_MANAGEMENT_GUIDE.md already exists")
@@ -593,7 +593,7 @@ def init_project(
             stage_docs = generate_stage_docs(template)
             guide_content = GUIDE_TEMPLATE.format(stage_docs=stage_docs)
             guide_path.write_text(guide_content, encoding='utf-8')
-            results.append(f"✅ Created .memory/docs/PROJECT_MANAGEMENT_GUIDE.md")
+            results.append(f"✅ Created .workflow/docs/PROJECT_MANAGEMENT_GUIDE.md")
 
     # 4. Create workflow instructions template
     if with_claude_md:
@@ -608,7 +608,7 @@ def init_project(
             results.append("📋 CLAUDE.md already exists. Add these lines:")
             results.append("-" * 50)
             results.append("1. At the TOP of CLAUDE.md, add:")
-            results.append("   @import .memory/ACTIVE_STATUS.md")
+            results.append("   @import .workflow/ACTIVE_STATUS.md")
             results.append("")
             results.append("2. Add the workflow section from:")
             results.append("   .workflow/WORKFLOW_INSTRUCTIONS.md")
@@ -617,7 +617,7 @@ def init_project(
             # No CLAUDE.md - create a minimal one
             minimal_claude = '''# AI Agent Instructions
 
-@import .memory/ACTIVE_STATUS.md
+@import .workflow/ACTIVE_STATUS.md
 
 ## Workflow Protocol
 
@@ -650,8 +650,8 @@ Project: {project_name}
     gitignore_entries = """
 # Workflow Tool
 .workflow/secret
-.workflow/audit.log
-.memory/ACTIVE_STATUS.md
+.workflow/audit/
+.workflow/ACTIVE_STATUS.md
 """
     if gitignore_path.exists():
         content = gitignore_path.read_text()

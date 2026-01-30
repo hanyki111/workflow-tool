@@ -27,7 +27,7 @@ class WorkflowController:
         # Initialize Engine with Context
         self.context = WorkflowContext(initial_data=self.config.variables)
         self.engine = WorkflowEngine(self.config, self.context)
-        self.audit = WorkflowAuditManager()
+        self.audit = WorkflowAuditManager(audit_dir=self.config.audit_dir)
         
         if self.state.current_stage:
             self.engine.set_stage(self.state.current_stage)
@@ -206,12 +206,14 @@ class WorkflowController:
         return f"{prefix}Transitioned to {transition.target}\n" + self.status()
 
     def _update_active_status_file(self, checklist_text: str):
-        path = ".memory/ACTIVE_STATUS.md"
+        path = self.config.status_file
         content = f"> **[CURRENT WORKFLOW STATE]**\n"
         content += f"> Updated at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
         content += ">\n"
         content += f"```markdown\n{checklist_text}\n```\n"
-        os.makedirs(os.path.dirname(path), exist_ok=True)
+        parent_dir = os.path.dirname(path)
+        if parent_dir:
+            os.makedirs(parent_dir, exist_ok=True)
         with open(path, "w") as f:
             f.write(content)
 

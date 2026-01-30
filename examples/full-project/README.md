@@ -210,5 +210,5 @@ stages:
 
 ## Related
 
-- [PROJECT_MANAGEMENT_GUIDE.md](../../.memory/docs/PROJECT_MANAGEMENT_GUIDE.md)
-- [ARCHITECTURE.md](../../.memory/docs/ARCHITECTURE.md)
+- [Main README](../../README.md) - Full documentation
+- [Tutorial](../../workflow/tutorial/) - Learning materials

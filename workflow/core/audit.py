@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import List, Dict, Any
 
 class AuditLogger:
-    def __init__(self, log_dir: str = ".memory/audit"):
+    def __init__(self, log_dir: str = ".workflow/audit"):
         self.log_dir = log_dir
         os.makedirs(log_dir, exist_ok=True)
         self.log_file = os.path.join(log_dir, "workflow.log")
@@ -38,8 +38,8 @@ class AuditLogger:
             return "error"
 
 class WorkflowAuditManager:
-    def __init__(self):
-        self.logger = AuditLogger()
+    def __init__(self, audit_dir: str = ".workflow/audit"):
+        self.logger = AuditLogger(log_dir=audit_dir)
 
     def record_transition(self, from_stage: str, to_stage: str, module: str, results: List[Dict], forced: bool = False, reason: str = ""):
         data = {

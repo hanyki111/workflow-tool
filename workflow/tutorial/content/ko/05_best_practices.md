@@ -130,6 +130,6 @@ python -c "from workflow.plugins.fs import FileExistsValidator"
 축하합니다! workflow-tool 튜토리얼을 완료했습니다.
 
 추가 정보:
-- 문서: `.memory/docs/`
+- 문서: `.workflow/docs/`
 - 구성: `workflow.yaml`
 - 이슈: https://github.com/workflow-tool/workflow-tool/issues

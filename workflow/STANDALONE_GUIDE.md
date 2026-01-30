@@ -46,8 +46,12 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")
 독립된 도구를 다른 프로젝트에서 사용하려면:
 
 1. **패키지 설치**: `pip install -e /path/to/ai-workflow-engine`
-2. **설정 파일 복사**: `workflow.yaml`과 가이드 문서(`.memory/docs/PROJECT_MANAGEMENT_GUIDE.md`)를 대상 프로젝트에 배치합니다.
-3. **상태 관리**: 대상 프로젝트 루트에 `.workflow/` 디렉토리가 생성되며 상태가 관리됩니다.
+2. **초기화 명령**: `flow init` 또는 `flow init --template full`
+3. **생성되는 파일들**:
+   - `workflow.yaml` - 워크플로우 정의
+   - `.workflow/state.json` - 현재 상태
+   - `.workflow/docs/PROJECT_MANAGEMENT_GUIDE.md` - 가이드 문서
+   - `CLAUDE.md` - AI 에이전트 지침 (선택)
 
 ## 4. 향후 확장 제안
 

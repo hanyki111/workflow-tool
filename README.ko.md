@@ -270,14 +270,12 @@ my-project/
 ├── .workflow/
 │   ├── state.json          # 현재 상태 (자동 생성)
 │   ├── secret              # USER-APPROVE용 비밀 해시 (gitignore)
-│   └── audit.log           # 작업 감사 로그 (gitignore)
-├── .memory/                # 프로젝트 지식 (선택)
-│   ├── docs/
+│   ├── audit/              # 작업 감사 로그 (gitignore)
+│   │   └── workflow.log
+│   ├── docs/               # 워크플로우 문서
 │   │   └── PROJECT_MANAGEMENT_GUIDE.md
-│   └── modules/
-│       └── [feature-name]/
-│           ├── spec.md
-│           └── current.md
+│   └── ACTIVE_STATUS.md    # AI 상태 훅 (자동 생성, gitignore)
+├── CLAUDE.md               # AI 에이전트 지침 (선택)
 └── ... (프로젝트 파일들)
 ```
 
@@ -298,6 +296,12 @@ variables:
 plugins:
   fs: "workflow.plugins.fs.FileExistsValidator"
   shell: "workflow.plugins.shell.CommandValidator"
+
+# 경로 설정 (선택, 모두 .workflow/ 기본값)
+docs_dir: ".workflow/docs"              # 문서 디렉토리
+audit_dir: ".workflow/audit"            # 감사 로그 디렉토리
+status_file: ".workflow/ACTIVE_STATUS.md"  # AI 상태 훅 파일
+guide_file: ".workflow/docs/PROJECT_MANAGEMENT_GUIDE.md"  # 가이드 파일
 
 # 재사용 가능한 조건 세트 (선택)
 rulesets:
@@ -608,12 +612,12 @@ checklist:
 
 #### 2. 워크플로우 상태 자동 표시
 
-`.memory/ACTIVE_STATUS.md` 파일이 자동으로 업데이트됩니다. CLAUDE.md에서 이를 임포트합니다:
+`.workflow/ACTIVE_STATUS.md` 파일이 자동으로 업데이트됩니다. CLAUDE.md에서 이를 임포트합니다:
 
 ```markdown
 # CLAUDE.md
 
-@import .memory/ACTIVE_STATUS.md
+@import .workflow/ACTIVE_STATUS.md
 
 ## 작업 지침
 ...
@@ -628,7 +632,7 @@ checklist:
 ```markdown
 # For AI Agent 🤖
 
-@import .memory/ACTIVE_STATUS.md
+@import .workflow/ACTIVE_STATUS.md
 
 ---
 
@@ -1096,7 +1100,7 @@ flow status  # 새 상태 생성
 
 1. **튜토리얼**: `flow tutorial`
 2. **명령어 도움말**: `flow <command> --help`
-3. **문서**: `.memory/docs/`
+3. **문서**: `.workflow/docs/`
 4. **이슈**: https://github.com/your-org/workflow-tool/issues
 
 ---

@@ -32,8 +32,13 @@ class WorkflowConfigV2:
     rulesets: Dict[str, List[ConditionConfig]] = field(default_factory=list)
     stages: Dict[str, StageConfig] = field(default_factory=list)
     plugins: Dict[str, str] = field(default_factory=dict)
-    
-    # Existing fields for backward compatibility or global config
-    guide_file: str = ".memory/docs/PROJECT_MANAGEMENT_GUIDE.md"
+
+    # Path configuration (all default to .workflow/ for portability)
+    docs_dir: str = ".workflow/docs"           # Directory for guide and docs
+    audit_dir: str = ".workflow/audit"         # Directory for audit logs
+    status_file: str = ".workflow/ACTIVE_STATUS.md"  # Status file for AI hooks
+
+    # File paths (computed from dirs or explicit)
+    guide_file: str = ".workflow/docs/PROJECT_MANAGEMENT_GUIDE.md"
     state_file: str = ".workflow/state.json"
     secret_file: str = ".workflow/secret"
