@@ -18,10 +18,18 @@ class TransitionConfig:
     conditions: List[ConditionConfig] = field(default_factory=list)
 
 @dataclass
+class ChecklistItemConfig:
+    """Checklist item with optional action."""
+    text: str
+    action: Optional[str] = None      # Shell command to execute
+    require_args: bool = False        # Whether action needs --args
+    confirm: bool = False             # Ask for confirmation before action
+
+@dataclass
 class StageConfig:
     id: str
     label: str
-    checklist: List[str] = field(default_factory=list)
+    checklist: List[Any] = field(default_factory=list)  # str or ChecklistItemConfig
     transitions: List[TransitionConfig] = field(default_factory=list)
     on_enter: List[Dict[str, Any]] = field(default_factory=list)
 

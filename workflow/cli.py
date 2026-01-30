@@ -82,6 +82,10 @@ def main():
         "--evidence", "-e",
         help=t('help.check.evidence')
     )
+    check_parser.add_argument(
+        "--args", "-a",
+        help=t('help.check.args')
+    )
 
     # Set
     set_parser = subparsers.add_parser(
@@ -226,7 +230,7 @@ def main():
         elif args.command == "next":
             print(ctrl.next_stage(args.target, force=args.force, reason=args.reason, token=args.token))
         elif args.command == "check":
-            print(ctrl.check(args.indices, token=args.token, evidence=args.evidence))
+            print(ctrl.check(args.indices, token=args.token, evidence=args.evidence, args=args.args))
         elif args.command == "set":
             ctrl.state.current_stage = args.stage
             if args.module:

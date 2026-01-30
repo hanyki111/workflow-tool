@@ -2,9 +2,10 @@ from typing import List, Optional, Dict, Any
 import os
 import re
 import json
+import subprocess
 from datetime import datetime
 from .state import WorkflowState, CheckItem
-from .schema import WorkflowConfigV2
+from .schema import WorkflowConfigV2, ChecklistItemConfig
 from .parser import GuideParser, ConfigParserV2
 from .engine import WorkflowEngine
 from .validator import ValidatorRegistry
@@ -99,16 +100,22 @@ class WorkflowController:
 
         return "\n".join(output)
 
-    def check(self, indices: List[int], token: Optional[str] = None, evidence: Optional[str] = None) -> str:
+    def check(self, indices: List[int], token: Optional[str] = None, evidence: Optional[str] = None, args: Optional[str] = None) -> str:
         results = []
-        
+
+        # Get stage config for action definitions
+        stage_config = self.config.stages.get(self.state.current_stage)
+
         for index in indices:
             if index < 1 or index > len(self.state.checklist):
                 results.append(f"Invalid index: {index}")
                 continue
-            
+
             item = self.state.checklist[index - 1]
-            
+
+            # Get action config from stage definition (if available)
+            item_config = self._get_item_config(stage_config, index - 1) if stage_config else None
+
             # 1. Authorization Check (SHA-256)
             if item.text.strip().startswith("[USER-APPROVE]"):
                 if not token:
@@ -124,24 +131,102 @@ class WorkflowController:
                     results.append(f"❌ Error: Agent review from '{item.required_agent}' not found in logs for current stage.")
                     continue
 
+            # 3. Execute Action (if defined)
+            if item_config and item_config.action:
+                action_result = self._execute_action(item_config, args)
+                if not action_result['success']:
+                    results.append(f"❌ Action failed for item {index}: {action_result['error']}")
+                    continue
+                results.append(f"✅ Action executed: {action_result['command']}")
+                if action_result.get('output'):
+                    results.append(f"   Output: {action_result['output'][:200]}")
+
             item.checked = True
             if evidence:
                 item.evidence = evidence
 
             results.append(f"Checked: {item.text}")
-            
-            # Log individual manual check
-            self.audit.logger.log_event("MANUAL_CHECK", {
+
+            # Log individual check with action info
+            log_data = {
                 "milestone": self.state.current_milestone,
                 "phase": self.state.current_phase,
                 "stage": self.state.current_stage,
                 "item": item.text,
                 "evidence": evidence
-            })
-            
+            }
+            if item_config and item_config.action:
+                log_data["action_executed"] = item_config.action
+                log_data["action_args"] = args
+            self.audit.logger.log_event("MANUAL_CHECK", log_data)
+
         self.state.save(self.config.state_file)
-        self.status() 
+        self.status()
         return "\n".join(results)
+
+    def _get_item_config(self, stage_config, index: int) -> Optional[ChecklistItemConfig]:
+        """Get checklist item config from stage definition."""
+        if not stage_config or index >= len(stage_config.checklist):
+            return None
+
+        item = stage_config.checklist[index]
+        if isinstance(item, ChecklistItemConfig):
+            return item
+        return None
+
+    def _execute_action(self, item_config: ChecklistItemConfig, args: Optional[str] = None) -> Dict[str, Any]:
+        """Execute the action command for a checklist item."""
+        # Check if args are required but not provided
+        if item_config.require_args and not args:
+            return {
+                'success': False,
+                'error': f"This action requires --args. Usage: flow check N --args \"your arguments\""
+            }
+
+        # Substitute variables in action command
+        command = item_config.action
+        if args:
+            command = command.replace('{args}', args)
+
+        # Substitute context variables
+        for key, value in self.context.data.items():
+            command = command.replace(f'${{{key}}}', str(value))
+
+        try:
+            result = subprocess.run(
+                command,
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=300  # 5 minute timeout
+            )
+
+            if result.returncode != 0:
+                return {
+                    'success': False,
+                    'command': command,
+                    'error': result.stderr or f"Command exited with code {result.returncode}",
+                    'output': result.stdout
+                }
+
+            return {
+                'success': True,
+                'command': command,
+                'output': result.stdout
+            }
+
+        except subprocess.TimeoutExpired:
+            return {
+                'success': False,
+                'command': command,
+                'error': "Action timed out after 5 minutes"
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'command': command,
+                'error': str(e)
+            }
 
     def next_stage(self, target: Optional[str] = None, force: bool = False, reason: str = "", token: Optional[str] = None) -> str:
         """Attempts to move to the next stage after validating conditions."""

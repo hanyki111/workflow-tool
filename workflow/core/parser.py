@@ -2,7 +2,7 @@ import re
 import yaml
 from typing import List, Optional, Dict, Any
 from .state import CheckItem
-from .schema import WorkflowConfigV2, StageConfig, TransitionConfig, ConditionConfig
+from .schema import WorkflowConfigV2, StageConfig, TransitionConfig, ConditionConfig, ChecklistItemConfig
 
 class GuideParser:
     def __init__(self, content: str):
@@ -69,10 +69,23 @@ class ConfigParserV2:
         # Parse stages
         stages = {}
         for s_id, s_data in data.get('stages', {}).items():
+            # Parse checklist items (support both string and dict format)
+            checklist = []
+            for item in s_data.get('checklist', []):
+                if isinstance(item, str):
+                    checklist.append(item)
+                elif isinstance(item, dict):
+                    checklist.append(ChecklistItemConfig(
+                        text=item.get('text', ''),
+                        action=item.get('action'),
+                        require_args=item.get('require_args', False),
+                        confirm=item.get('confirm', False)
+                    ))
+
             stages[s_id] = StageConfig(
                 id=s_id,
                 label=s_data.get('label', s_id),
-                checklist=s_data.get('checklist', []),
+                checklist=checklist,
                 transitions=[ConfigParserV2._parse_transition(t) for t in s_data.get('transitions', [])],
                 on_enter=s_data.get('on_enter', [])
             )

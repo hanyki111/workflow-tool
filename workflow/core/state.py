@@ -9,6 +9,8 @@ class CheckItem:
     checked: bool = False
     evidence: Optional[str] = None
     required_agent: Optional[str] = None
+    action: Optional[str] = None  # Shell command to execute on check
+    require_args: bool = False    # Whether action requires --args
 
 @dataclass
 class WorkflowState:
@@ -30,7 +32,9 @@ class WorkflowState:
                 text=item.get('text', ""),
                 checked=item.get('checked', False),
                 evidence=item.get('evidence', None),
-                required_agent=item.get('required_agent', None)
+                required_agent=item.get('required_agent', None),
+                action=item.get('action', None),
+                require_args=item.get('require_args', False)
             ))
         return cls(
             current_milestone=data.get('current_milestone', ""),

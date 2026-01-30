@@ -25,6 +25,7 @@ help:
     indices: "항목 인덱스 (1부터 시작)"
     token: "USER-APPROVE 항목용 비밀 토큰"
     evidence: "감사 증거 또는 근거 추가"
+    args: "액션 명령어용 인자 (예: 커밋 메시지)"
 
   set:
     description: "현재 스테이지/모듈 수동 설정"

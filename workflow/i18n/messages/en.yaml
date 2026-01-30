@@ -25,6 +25,7 @@ help:
     indices: "Item indices (1-based)"
     token: "Secret token for USER-APPROVE items"
     evidence: "Add audit evidence or justification"
+    args: "Arguments for action command (e.g., commit message)"
 
   set:
     description: "Manually set current stage/module"
