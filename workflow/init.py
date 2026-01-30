@@ -280,18 +280,20 @@ Run `flow status` to see current stage and checklist.
 {stage_docs}
 '''
 
-# Template: CLAUDE.md (AI instructions)
-CLAUDE_MD_TEMPLATE = '''# AI Agent Instructions
-
-@import .memory/ACTIVE_STATUS.md
-
----
-
+# Template: Workflow instructions for AI (to be added to existing CLAUDE.md)
+WORKFLOW_INSTRUCTIONS_TEMPLATE = '''
 ## Workflow Protocol (MANDATORY)
 
-This project uses `workflow-tool` for structured development workflow.
+> **This project uses `workflow-tool` for structured development.**
+
+### Setup (Add to top of CLAUDE.md)
+
+```markdown
+@import .memory/ACTIVE_STATUS.md
+```
 
 ### Every Turn
+
 1. **Run** `flow status` to check current stage and checklist
 2. **State** current stage: `**[Stage XX]** Stage Name`
 3. **Follow** checklist items in order
@@ -299,12 +301,14 @@ This project uses `workflow-tool` for structured development workflow.
 5. **Advance** when ready: `flow next`
 
 ### Stage Declaration Format
+
 ```
 **[Stage M2]** Milestone Discussion
 **[Stage P4]** Implementation (Phase 1.2)
 ```
 
 ### Commands Reference
+
 | Command | Usage |
 |---------|-------|
 | `flow status` | Check current state |
@@ -315,21 +319,47 @@ This project uses `workflow-tool` for structured development workflow.
 | `flow set XX` | Jump to stage XX |
 
 ### USER-APPROVE Items
+
 When encountering `[USER-APPROVE]` items, ask the user to run:
+
 ```bash
 flow check N --token "their-secret"
 ```
 
 ### Prohibited Actions
+
 - Do NOT skip checklist items
 - Do NOT use `--force` without explicit permission
 - Do NOT ignore USER-APPROVE requirements
+'''
 
----
+# Minimal snippet to add to existing CLAUDE.md
+CLAUDE_MD_SNIPPET = '''
+# ============================================================
+# Workflow Tool Integration
+# ============================================================
+# Add this line at the TOP of your CLAUDE.md:
+#   @import .memory/ACTIVE_STATUS.md
+#
+# Add the section below to your CLAUDE.md:
+# ============================================================
 
-## Project Context
+## Workflow Protocol
 
-{project_description}
+> This project uses `workflow-tool`. Run `flow status` at the start of every turn.
+
+**Quick Reference:**
+- `flow status` - Check current stage and checklist
+- `flow check N` - Mark item N as done
+- `flow check N --evidence "..."` - Mark with justification
+- `flow check N --token "..."` - For [USER-APPROVE] items
+- `flow next` - Move to next stage
+
+**Rules:**
+1. Always run `flow status` first
+2. State current stage: `**[Stage XX]** Name`
+3. Complete checklist items in order
+4. Never skip [USER-APPROVE] items
 '''
 
 
@@ -565,17 +595,55 @@ def init_project(
             guide_path.write_text(guide_content, encoding='utf-8')
             results.append(f"✅ Created .memory/docs/PROJECT_MANAGEMENT_GUIDE.md")
 
-    # 4. Create CLAUDE.md (AI instructions)
+    # 4. Create workflow instructions template
     if with_claude_md:
+        template_path = workflow_dir / "WORKFLOW_INSTRUCTIONS.md"
+        template_path.write_text(WORKFLOW_INSTRUCTIONS_TEMPLATE, encoding='utf-8')
+        results.append(f"✅ Created .workflow/WORKFLOW_INSTRUCTIONS.md")
+
         claude_path = cwd / "CLAUDE.md"
-        if claude_path.exists() and not force:
-            results.append(f"⚠️  CLAUDE.md already exists")
+        if claude_path.exists():
+            # CLAUDE.md exists - provide guidance on what to add
+            results.append("")
+            results.append("📋 CLAUDE.md already exists. Add these lines:")
+            results.append("-" * 50)
+            results.append("1. At the TOP of CLAUDE.md, add:")
+            results.append("   @import .memory/ACTIVE_STATUS.md")
+            results.append("")
+            results.append("2. Add the workflow section from:")
+            results.append("   .workflow/WORKFLOW_INSTRUCTIONS.md")
+            results.append("-" * 50)
         else:
-            claude_content = CLAUDE_MD_TEMPLATE.format(
-                project_description=f"Project: {project_name}\nTemplate: {template}"
-            )
-            claude_path.write_text(claude_content, encoding='utf-8')
-            results.append(f"✅ Created CLAUDE.md (AI instructions)")
+            # No CLAUDE.md - create a minimal one
+            minimal_claude = '''# AI Agent Instructions
+
+@import .memory/ACTIVE_STATUS.md
+
+## Workflow Protocol
+
+> This project uses `workflow-tool`. Run `flow status` at the start of every turn.
+
+**Quick Reference:**
+- `flow status` - Check current stage and checklist
+- `flow check N` - Mark item N as done
+- `flow check N --evidence "..."` - Mark with justification
+- `flow check N --token "..."` - For [USER-APPROVE] items
+- `flow next` - Move to next stage
+
+**Rules:**
+1. Always run `flow status` first
+2. State current stage: `**[Stage XX]** Name`
+3. Complete checklist items in order
+4. Never skip [USER-APPROVE] items
+
+---
+
+## Project Context
+
+Project: {project_name}
+'''
+            claude_path.write_text(minimal_claude.format(project_name=project_name), encoding='utf-8')
+            results.append(f"✅ Created CLAUDE.md (minimal template)")
 
     # 5. Create .gitignore entries suggestion
     gitignore_path = cwd / ".gitignore"
