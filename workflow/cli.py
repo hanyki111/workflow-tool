@@ -58,6 +58,10 @@ def main():
         default="",
         help=t('help.next.reason')
     )
+    next_parser.add_argument(
+        "--token",
+        help=t('help.next.token')
+    )
 
     # Check
     check_parser = subparsers.add_parser(
@@ -220,7 +224,7 @@ def main():
         if args.command == "status":
             print(ctrl.status())
         elif args.command == "next":
-            print(ctrl.next_stage(args.target, force=args.force, reason=args.reason))
+            print(ctrl.next_stage(args.target, force=args.force, reason=args.reason, token=args.token))
         elif args.command == "check":
             print(ctrl.check(args.indices, token=args.token, evidence=args.evidence))
         elif args.command == "set":

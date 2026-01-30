@@ -16,8 +16,9 @@ help:
   next:
     description: "Move to next stage"
     target: "Target stage code (e.g., M1, P2)"
-    force: "Force transition skipping rules"
+    force: "Force transition skipping rules (requires --token)"
     reason: "Reason for forced transition"
+    token: "USER-APPROVE token (required for --force)"
 
   check:
     description: "Mark checklist items as done"

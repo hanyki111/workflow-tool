@@ -143,10 +143,16 @@ class WorkflowController:
         self.status() 
         return "\n".join(results)
 
-    def next_stage(self, target: Optional[str] = None, force: bool = False, reason: str = "") -> str:
+    def next_stage(self, target: Optional[str] = None, force: bool = False, reason: str = "", token: Optional[str] = None) -> str:
         """Attempts to move to the next stage after validating conditions."""
-        if force and not reason.strip():
-            return "❌ Error: A non-empty reason is mandatory for a forced transition."
+        if force:
+            # Force requires USER-APPROVE token
+            if not token:
+                return "❌ Error: --force requires USER-APPROVE token. Use: flow next --force --token YOUR_TOKEN --reason \"...\""
+            if not verify_token(token):
+                return "❌ Error: Invalid token for --force. USER-APPROVE required."
+            if not reason.strip():
+                return "❌ Error: A non-empty reason is mandatory for a forced transition."
 
         # 1. Validate Checklist (Human Requirement)
         unchecked = [i for i in self.state.checklist if not i.checked]
