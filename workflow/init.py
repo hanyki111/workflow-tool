@@ -286,32 +286,35 @@ WORKFLOW_INSTRUCTIONS_TEMPLATE = '''
 
 > **This project uses `workflow-tool` for structured development.**
 
+### ⚠️ CRITICAL RULES (NON-NEGOTIABLE)
+
+1. **ALWAYS use `flow` commands** - NEVER manually edit status files
+2. **ALWAYS run `flow status`** at the start of EVERY response
+3. **ALWAYS use `flow check N`** to mark items done
+4. **ALWAYS use `flow next`** to transition stages
+5. **NEVER skip these steps** even if you "remember" the state
+
 ### Setup (Add to top of CLAUDE.md)
 
 ```markdown
 @import .workflow/ACTIVE_STATUS.md
 ```
 
-### Every Turn
-
-1. **Run** `flow status` to check current stage and checklist
-2. **State** current stage: `**[Stage XX]** Stage Name`
-3. **Follow** checklist items in order
-4. **Check** items as completed: `flow check N --evidence "description"`
-5. **Advance** when ready: `flow next`
-
-### Stage Declaration Format
+### Every Turn Checklist
 
 ```
-**[Stage M2]** Milestone Discussion
-**[Stage P4]** Implementation (Phase 1.2)
+□ Run `flow status` FIRST
+□ State current stage: **[Stage XX]** Name
+□ Work on checklist items in order
+□ Run `flow check N` after completing each item
+□ Run `flow next` when all items are done
 ```
 
 ### Commands Reference
 
 | Command | Usage |
 |---------|-------|
-| `flow status` | Check current state |
+| `flow status` | Check current state (RUN FIRST!) |
 | `flow check N` | Mark item N as done |
 | `flow check N --evidence "..."` | Mark with evidence |
 | `flow check N --token "..."` | USER-APPROVE items |
@@ -328,9 +331,11 @@ flow check N --token "their-secret"
 
 ### Prohibited Actions
 
-- Do NOT skip checklist items
-- Do NOT use `--force` without explicit permission
-- Do NOT ignore USER-APPROVE requirements
+- ❌ Manually editing ACTIVE_STATUS.md or state.json
+- ❌ Skipping checklist items
+- ❌ Using `--force` without explicit permission
+- ❌ Ignoring USER-APPROVE requirements
+- ❌ Proceeding without running `flow status` first
 '''
 
 # Minimal snippet to add to existing CLAUDE.md
@@ -619,22 +624,34 @@ def init_project(
 
 @import .workflow/ACTIVE_STATUS.md
 
-## Workflow Protocol
+## ⚠️ Workflow Protocol (MANDATORY)
 
-> This project uses `workflow-tool`. Run `flow status` at the start of every turn.
+> This project uses `workflow-tool`. **You MUST use `flow` commands.**
 
-**Quick Reference:**
-- `flow status` - Check current stage and checklist
-- `flow check N` - Mark item N as done
-- `flow check N --evidence "..."` - Mark with justification
-- `flow check N --token "..."` - For [USER-APPROVE] items
-- `flow next` - Move to next stage
+### Critical Rules (Non-negotiable)
 
-**Rules:**
-1. Always run `flow status` first
-2. State current stage: `**[Stage XX]** Name`
-3. Complete checklist items in order
-4. Never skip [USER-APPROVE] items
+1. **ALWAYS** run `flow status` at the START of every response
+2. **ALWAYS** use `flow check N` to mark items done
+3. **ALWAYS** use `flow next` to transition stages
+4. **NEVER** manually edit ACTIVE_STATUS.md or state files
+
+### Commands
+
+| Command | Usage |
+|---------|-------|
+| `flow status` | Check current state (RUN FIRST!) |
+| `flow check N` | Mark item N as done |
+| `flow check N --evidence "..."` | Mark with justification |
+| `flow check N --token "..."` | For [USER-APPROVE] items |
+| `flow next` | Move to next stage |
+
+### Every Turn
+
+1. Run `flow status`
+2. State: `**[Stage XX]** Name`
+3. Work on checklist items
+4. Run `flow check N` after each item
+5. Run `flow next` when all done
 
 ---
 

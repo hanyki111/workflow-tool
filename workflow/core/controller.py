@@ -72,15 +72,31 @@ class WorkflowController:
         output = [f"Current Stage: {self.state.current_stage} ({header_title})", "=" * 40]
         output.append(f"Active Module: {self.context.data.get('active_module', 'None')}")
         output.append("-" * 40)
-        
+
         for idx, item in enumerate(self.state.checklist):
             mark = "[x]" if item.checked else "[ ]"
             agent_label = f" (Req: {item.required_agent})" if item.required_agent else ""
             output.append(f"{idx + 1}. {mark} {item.text}{agent_label}")
-            
-        # Update Hook File
-        self._update_active_status_file("\n".join(output))
-        
+
+        # Calculate progress and suggest next action
+        unchecked_indices = [i + 1 for i, item in enumerate(self.state.checklist) if not item.checked]
+        checked_count = len(self.state.checklist) - len(unchecked_indices)
+        total_count = len(self.state.checklist)
+
+        output.append("-" * 40)
+        output.append(f"Progress: {checked_count}/{total_count} completed")
+
+        if unchecked_indices:
+            indices_str = " ".join(map(str, unchecked_indices[:3]))
+            if len(unchecked_indices) > 3:
+                indices_str += " ..."
+            output.append(f"→ Next: `flow check {indices_str}`")
+        else:
+            output.append("→ All items done! Run: `flow next`")
+
+        # Update Hook File with hints
+        self._update_active_status_file("\n".join(output), unchecked_indices)
+
         return "\n".join(output)
 
     def check(self, indices: List[int], token: Optional[str] = None, evidence: Optional[str] = None) -> str:
@@ -205,12 +221,23 @@ class WorkflowController:
         prefix = "⚠️ [FORCED] " if force else "✅ "
         return f"{prefix}Transitioned to {transition.target}\n" + self.status()
 
-    def _update_active_status_file(self, checklist_text: str):
+    def _update_active_status_file(self, checklist_text: str, unchecked_indices: list = None):
         path = self.config.status_file
         content = f"> **[CURRENT WORKFLOW STATE]**\n"
         content += f"> Updated at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
         content += ">\n"
         content += f"```markdown\n{checklist_text}\n```\n"
+
+        # Add action hints for AI agents
+        content += "\n> **⚠️ WORKFLOW RULES (MANDATORY)**\n"
+        content += "> - Use `flow check N` to mark items done (NEVER edit this file manually)\n"
+        content += "> - Use `flow next` when all items are completed\n"
+        if unchecked_indices:
+            indices_str = " ".join(map(str, unchecked_indices[:5]))
+            content += f"> - **Next action:** `flow check {indices_str}`\n"
+        else:
+            content += "> - **Next action:** `flow next` (all items done!)\n"
+
         parent_dir = os.path.dirname(path)
         if parent_dir:
             os.makedirs(parent_dir, exist_ok=True)
