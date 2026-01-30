@@ -136,6 +136,18 @@ class WorkflowController:
                 action_result = self._execute_action(item_config, args)
                 if not action_result['success']:
                     results.append(f"❌ Action failed for item {index}: {action_result['error']}")
+                    # Show stdout if available (useful for test output, etc.)
+                    if action_result.get('output'):
+                        output_lines = action_result['output'].strip().split('\n')
+                        # Show last 10 lines of output (most relevant for failures)
+                        if len(output_lines) > 10:
+                            results.append(f"   Output (last 10 lines):")
+                            for line in output_lines[-10:]:
+                                results.append(f"   | {line}")
+                        else:
+                            results.append(f"   Output:")
+                            for line in output_lines:
+                                results.append(f"   | {line}")
                     results.append(f"   → Use --skip-action to mark as done without running action")
                     continue
                 results.append(f"✅ Action executed: {action_result['command']}")
