@@ -87,6 +87,60 @@ class TestContextResolver:
         assert result is not None
 
 
+class TestArgsSubstitution:
+    """Test ${args} substitution (special case for CLI --args)."""
+
+    def test_args_in_context(self):
+        """${args} should be resolved when args is in context."""
+        ctx = WorkflowContext()
+        ctx.data['args'] = "feat: add new feature"
+
+        resolver = ctx.get_resolver()
+        result = resolver.resolve('git commit -m "${args}"')
+
+        # Should NOT have any $ in the result (except in the command itself)
+        assert result == 'git commit -m "feat: add new feature"'
+        assert "${args}" not in result
+
+    def test_args_nested_in_variable(self):
+        """${args} inside another variable should be resolved."""
+        ctx = WorkflowContext()
+        ctx.data['args'] = "fix: bug fix"
+        ctx.data['commit_cmd'] = 'git commit -m "${args}"'
+
+        resolver = ctx.get_resolver()
+        result = resolver.resolve("${commit_cmd}")
+
+        assert result == 'git commit -m "fix: bug fix"'
+        assert "${args}" not in result
+        assert "${commit_cmd}" not in result
+
+    def test_args_with_special_characters(self):
+        """Args with special characters should work correctly."""
+        ctx = WorkflowContext()
+        ctx.data['args'] = "feat(auth): add OAuth2 login"
+
+        resolver = ctx.get_resolver()
+        result = resolver.resolve("${args}")
+
+        assert result == "feat(auth): add OAuth2 login"
+        # No stray $ should remain
+        assert "$feat" not in result
+
+    def test_dollar_sign_fully_removed(self):
+        """$ prefix should be completely removed after substitution."""
+        ctx = WorkflowContext()
+        ctx.data['my_var'] = "hello world"
+
+        resolver = ctx.get_resolver()
+        result = resolver.resolve("echo ${my_var}")
+
+        assert result == "echo hello world"
+        # Ensure no $ remains from the ${} syntax
+        assert "$hello" not in result
+        assert "${my_var}" not in result
+
+
 class TestCommandExecution:
     """Test that commands execute correctly with resolved variables."""
 

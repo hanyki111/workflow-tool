@@ -812,12 +812,17 @@ stages:
 
       # Action with required arguments
       - text: "Git commit"
-        action: "git add . && git commit -m '{args}'"
+        action: "git add . && git commit -m \"${args}\""
         require_args: true
 
       # Action with context variables
       - text: "Update module status"
         action: "${python} -m memory_tool update ${active_module}"
+
+      # Action that accepts warnings (exit code 0 or 1)
+      - text: "Run linter (warnings OK)"
+        action: "eslint src/"
+        allowed_exit_codes: [0, 1]
 ```
 
 **Built-in Variables:**
@@ -829,8 +834,9 @@ Actions can use these built-in variables that are automatically substituted:
 | `${python}` | Current Python interpreter (venv-aware) | `/path/to/.venv/bin/python` |
 | `${python_exe}` | Alias for `${python}` | `/path/to/.venv/bin/python` |
 | `${cwd}` | Current working directory | `/path/to/project` |
+| `${args}` | CLI `--args` value (when provided) | `feat: add login` |
 
-Context variables from `workflow.yaml` (e.g., `${active_module}`) are also available.
+Context variables from `workflow.yaml` (e.g., `${active_module}`) are also available. Nested variables are supported (e.g., `${test_cmd}` containing `${python}`).
 
 > **Note:** Actions inherit the full shell environment including `PYTHONPATH`, `VIRTUAL_ENV`, and `PATH`. This ensures commands run in the same context as the workflow tool itself.
 
@@ -848,12 +854,18 @@ flow check 2
 
 # Item requiring arguments
 flow check 3 --args "feat(auth): add login validation"
-# ✅ Action executed: git add . && git commit -m 'feat(auth): add login validation'
+# ✅ Action executed: git add . && git commit -m "feat(auth): add login validation"
 # Checked: Git commit
 
 # If action fails, item is NOT checked
 flow check 2
 # ❌ Action failed for item 2: 3 tests failed
+#    → Use --skip-action to mark as done without running action
+
+# Skip action and mark as done manually
+flow check 2 --skip-action
+# ⚠️ Action skipped for item 2: pytest -v
+# Checked: Run tests
 ```
 
 **Benefits:**

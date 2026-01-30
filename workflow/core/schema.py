@@ -24,6 +24,7 @@ class ChecklistItemConfig:
     action: Optional[str] = None      # Shell command to execute
     require_args: bool = False        # Whether action needs --args
     confirm: bool = False             # Ask for confirmation before action
+    allowed_exit_codes: List[int] = field(default_factory=lambda: [0])  # Exit codes considered success
 
 @dataclass
 class StageConfig:

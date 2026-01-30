@@ -26,6 +26,7 @@ help:
     token: "Secret token for USER-APPROVE items"
     evidence: "Add audit evidence or justification"
     args: "Arguments for action command (e.g., commit message)"
+    skip_action: "Skip action execution (manual override)"
 
   set:
     description: "Manually set current stage/module"

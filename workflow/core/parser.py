@@ -79,7 +79,8 @@ class ConfigParserV2:
                         text=item.get('text', ''),
                         action=item.get('action'),
                         require_args=item.get('require_args', False),
-                        confirm=item.get('confirm', False)
+                        confirm=item.get('confirm', False),
+                        allowed_exit_codes=item.get('allowed_exit_codes', [0])
                     ))
 
             stages[s_id] = StageConfig(

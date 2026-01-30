@@ -957,12 +957,17 @@ stages:
 
       # 인자가 필요한 액션
       - text: "Git 커밋"
-        action: "git add . && git commit -m '{args}'"
+        action: "git add . && git commit -m \"${args}\""
         require_args: true
 
       # 컨텍스트 변수 사용
       - text: "모듈 상태 업데이트"
         action: "${python} -m memory_tool update ${active_module}"
+
+      # 경고 허용 액션 (종료 코드 0 또는 1)
+      - text: "린터 실행 (경고 허용)"
+        action: "eslint src/"
+        allowed_exit_codes: [0, 1]
 ```
 
 **내장 변수:**
@@ -974,8 +979,9 @@ stages:
 | `${python}` | 현재 Python 인터프리터 (venv 인식) | `/path/to/.venv/bin/python` |
 | `${python_exe}` | `${python}`의 별칭 | `/path/to/.venv/bin/python` |
 | `${cwd}` | 현재 작업 디렉토리 | `/path/to/project` |
+| `${args}` | CLI `--args` 값 (제공 시) | `feat: 로그인 추가` |
 
-`workflow.yaml`의 컨텍스트 변수(예: `${active_module}`)도 사용 가능합니다.
+`workflow.yaml`의 컨텍스트 변수(예: `${active_module}`)도 사용 가능합니다. 중첩 변수도 지원됩니다 (예: `${test_cmd}` 안에 `${python}` 포함).
 
 > **참고:** 액션은 `PYTHONPATH`, `VIRTUAL_ENV`, `PATH`를 포함한 전체 쉘 환경을 상속받습니다. 이를 통해 명령어가 워크플로우 툴과 동일한 환경에서 실행됩니다.
 
@@ -993,12 +999,18 @@ flow check 2
 
 # 인자가 필요한 항목
 flow check 3 --args "feat(auth): 로그인 검증 추가"
-# ✅ Action executed: git add . && git commit -m 'feat(auth): 로그인 검증 추가'
+# ✅ Action executed: git add . && git commit -m "feat(auth): 로그인 검증 추가"
 # Checked: Git 커밋
 
 # 액션 실패 시 항목이 체크되지 않음
 flow check 2
 # ❌ Action failed for item 2: 테스트 3개 실패
+#    → Use --skip-action to mark as done without running action
+
+# 액션 건너뛰고 수동으로 완료 표시
+flow check 2 --skip-action
+# ⚠️ Action skipped for item 2: pytest -v
+# Checked: 테스트 실행
 ```
 
 **장점:**

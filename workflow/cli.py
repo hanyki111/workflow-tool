@@ -86,6 +86,11 @@ def main():
         "--args", "-a",
         help=t('help.check.args')
     )
+    check_parser.add_argument(
+        "--skip-action",
+        action="store_true",
+        help=t('help.check.skip_action')
+    )
 
     # Set
     set_parser = subparsers.add_parser(
@@ -230,7 +235,7 @@ def main():
         elif args.command == "next":
             print(ctrl.next_stage(args.target, force=args.force, reason=args.reason, token=args.token))
         elif args.command == "check":
-            print(ctrl.check(args.indices, token=args.token, evidence=args.evidence, args=args.args))
+            print(ctrl.check(args.indices, token=args.token, evidence=args.evidence, args=args.args, skip_action=args.skip_action))
         elif args.command == "set":
             ctrl.state.current_stage = args.stage
             if args.module:

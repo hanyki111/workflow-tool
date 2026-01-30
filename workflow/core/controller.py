@@ -100,7 +100,7 @@ class WorkflowController:
 
         return "\n".join(output)
 
-    def check(self, indices: List[int], token: Optional[str] = None, evidence: Optional[str] = None, args: Optional[str] = None) -> str:
+    def check(self, indices: List[int], token: Optional[str] = None, evidence: Optional[str] = None, args: Optional[str] = None, skip_action: bool = False) -> str:
         results = []
 
         # Get stage config for action definitions
@@ -131,15 +131,18 @@ class WorkflowController:
                     results.append(f"❌ Error: Agent review from '{item.required_agent}' not found in logs for current stage.")
                     continue
 
-            # 3. Execute Action (if defined)
-            if item_config and item_config.action:
+            # 3. Execute Action (if defined and not skipped)
+            if item_config and item_config.action and not skip_action:
                 action_result = self._execute_action(item_config, args)
                 if not action_result['success']:
                     results.append(f"❌ Action failed for item {index}: {action_result['error']}")
+                    results.append(f"   → Use --skip-action to mark as done without running action")
                     continue
                 results.append(f"✅ Action executed: {action_result['command']}")
                 if action_result.get('output'):
                     results.append(f"   Output: {action_result['output'][:200]}")
+            elif item_config and item_config.action and skip_action:
+                results.append(f"⚠️ Action skipped for item {index}: {item_config.action}")
 
             item.checked = True
             if evidence:
@@ -186,15 +189,22 @@ class WorkflowController:
         # Substitute variables in action command using ContextResolver
         # This supports nested variables (e.g., ${test_cmd} containing ${python})
         command = item_config.action
-        if args:
-            command = command.replace('{args}', args)
 
-        # Use ContextResolver for proper nested variable resolution
-        # Built-in variables (python, cwd) are already in context via _inject_defaults()
-        resolver = self.context.get_resolver()
-        command = resolver.resolve(command)
+        # Add args to context temporarily for ${args} resolution
+        # This ensures both {args} and ${args} syntax work
+        if args:
+            self.context.data['args'] = args
 
         try:
+            # Use ContextResolver for proper nested variable resolution
+            # Built-in variables (python, cwd, args) are in context
+            resolver = self.context.get_resolver()
+            command = resolver.resolve(command)
+
+            # Also support legacy {args} syntax (without $)
+            if args:
+                command = command.replace('{args}', args)
+
             # Inherit current environment (including VIRTUAL_ENV, PATH, PYTHONPATH)
             env = os.environ.copy()
 
@@ -208,18 +218,22 @@ class WorkflowController:
                 cwd=os.getcwd()  # Run from current directory
             )
 
-            if result.returncode != 0:
+            # Check if exit code is in allowed list (default: [0])
+            allowed_codes = item_config.allowed_exit_codes or [0]
+            if result.returncode not in allowed_codes:
                 return {
                     'success': False,
                     'command': command,
-                    'error': result.stderr or f"Command exited with code {result.returncode}",
-                    'output': result.stdout
+                    'error': result.stderr or f"Command exited with code {result.returncode} (allowed: {allowed_codes})",
+                    'output': result.stdout,
+                    'exit_code': result.returncode
                 }
 
             return {
                 'success': True,
                 'command': command,
-                'output': result.stdout
+                'output': result.stdout,
+                'exit_code': result.returncode
             }
 
         except subprocess.TimeoutExpired:
@@ -234,6 +248,10 @@ class WorkflowController:
                 'command': command,
                 'error': str(e)
             }
+        finally:
+            # Clean up temporary args from context
+            if args and 'args' in self.context.data:
+                del self.context.data['args']
 
     def next_stage(self, target: Optional[str] = None, force: bool = False, reason: str = "", token: Optional[str] = None) -> str:
         """Attempts to move to the next stage after validating conditions."""

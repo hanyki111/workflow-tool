@@ -72,6 +72,29 @@ class TestCommandValidator:
         assert result is False
 
 
+class TestAllowedExitCodes:
+    """Test allowed_exit_codes feature."""
+
+    def test_default_only_zero_allowed(self):
+        """By default, only exit code 0 is success."""
+        from workflow.core.schema import ChecklistItemConfig
+
+        config = ChecklistItemConfig(text="Test", action="exit 1")
+        assert config.allowed_exit_codes == [0]
+
+    def test_custom_exit_codes(self):
+        """Custom exit codes can be specified."""
+        from workflow.core.schema import ChecklistItemConfig
+
+        config = ChecklistItemConfig(
+            text="Test",
+            action="exit 1",
+            allowed_exit_codes=[0, 1]
+        )
+        assert 0 in config.allowed_exit_codes
+        assert 1 in config.allowed_exit_codes
+
+
 class TestFileExistsValidator:
     """Test FileExistsValidator plugin."""
 
