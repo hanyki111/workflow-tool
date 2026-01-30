@@ -3,7 +3,6 @@ import os
 import re
 import json
 import subprocess
-import sys
 from datetime import datetime
 from .state import WorkflowState, CheckItem
 from .schema import WorkflowConfigV2, ChecklistItemConfig
@@ -184,25 +183,16 @@ class WorkflowController:
                 'error': f"This action requires --args. Usage: flow check N --args \"your arguments\""
             }
 
-        # Substitute variables in action command
+        # Substitute variables in action command using ContextResolver
+        # This supports nested variables (e.g., ${test_cmd} containing ${python})
         command = item_config.action
         if args:
             command = command.replace('{args}', args)
 
-        # Built-in variables
-        builtin_vars = {
-            'python': sys.executable,      # Current Python interpreter (venv-aware)
-            'python_exe': sys.executable,  # Alias
-            'cwd': os.getcwd(),            # Current working directory
-        }
-
-        # Substitute built-in variables first
-        for key, value in builtin_vars.items():
-            command = command.replace(f'${{{key}}}', str(value))
-
-        # Substitute context variables
-        for key, value in self.context.data.items():
-            command = command.replace(f'${{{key}}}', str(value))
+        # Use ContextResolver for proper nested variable resolution
+        # Built-in variables (python, cwd) are already in context via _inject_defaults()
+        resolver = self.context.get_resolver()
+        command = resolver.resolve(command)
 
         try:
             # Inherit current environment (including VIRTUAL_ENV, PATH, PYTHONPATH)

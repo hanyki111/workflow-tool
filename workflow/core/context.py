@@ -1,5 +1,6 @@
 import os
 import re
+import sys
 from typing import Any, Dict, List, Union
 
 class ContextResolver:
@@ -57,6 +58,10 @@ class WorkflowContext:
     def _inject_defaults(self):
         self.data['project_root'] = os.getcwd()
         self.data['env'] = dict(os.environ)
+        # Built-in variables for action commands
+        self.data['python'] = sys.executable       # Current Python interpreter (venv-aware)
+        self.data['python_exe'] = sys.executable   # Alias
+        self.data['cwd'] = os.getcwd()             # Current working directory
 
     def update(self, key: str, value: Any):
         self.data[key] = value
