@@ -51,6 +51,15 @@ help:
   lang:
     description: "Set display language (en, ko)"
 
+  init:
+    description: "Initialize workflow in current directory"
+    template: "Workflow template: simple or full (default: simple)"
+    name: "Project name (default: directory name)"
+    no_claude_md: "Skip creating CLAUDE.md (AI instructions)"
+    no_guide: "Skip creating PROJECT_MANAGEMENT_GUIDE.md"
+    force: "Overwrite existing files"
+    list_templates: "Show available templates"
+
 commands:
   status:
     title: "Current Stage"

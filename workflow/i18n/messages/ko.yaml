@@ -51,6 +51,15 @@ help:
   lang:
     description: "표시 언어 설정 (en, ko)"
 
+  init:
+    description: "현재 디렉토리에 워크플로우 초기화"
+    template: "워크플로우 템플릿: simple 또는 full (기본: simple)"
+    name: "프로젝트 이름 (기본: 디렉토리 이름)"
+    no_claude_md: "CLAUDE.md (AI 지침) 생성 건너뛰기"
+    no_guide: "PROJECT_MANAGEMENT_GUIDE.md 생성 건너뛰기"
+    force: "기존 파일 덮어쓰기"
+    list_templates: "사용 가능한 템플릿 보기"
+
 commands:
   status:
     title: "현재 스테이지"

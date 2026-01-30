@@ -7,6 +7,7 @@ from .core.auth import generate_secret_interactive
 from .i18n import t, set_language
 from .i18n.detector import detect_language
 from .tutorial import run_tutorial
+from .init import init_project, show_templates
 
 
 def main():
@@ -147,6 +148,42 @@ def main():
         help=t('help.tutorial.section_name')
     )
 
+    # Init
+    init_parser = subparsers.add_parser(
+        "init",
+        help=t('help.init.description')
+    )
+    init_parser.add_argument(
+        "--template", "-t",
+        choices=["simple", "full"],
+        default="simple",
+        help=t('help.init.template')
+    )
+    init_parser.add_argument(
+        "--name", "-n",
+        help=t('help.init.name')
+    )
+    init_parser.add_argument(
+        "--no-claude-md",
+        action="store_true",
+        help=t('help.init.no_claude_md')
+    )
+    init_parser.add_argument(
+        "--no-guide",
+        action="store_true",
+        help=t('help.init.no_guide')
+    )
+    init_parser.add_argument(
+        "--force", "-f",
+        action="store_true",
+        help=t('help.init.force')
+    )
+    init_parser.add_argument(
+        "--list-templates",
+        action="store_true",
+        help=t('help.init.list_templates')
+    )
+
     args = parser.parse_args()
 
     # Handle tutorial command (doesn't need WorkflowController)
@@ -159,6 +196,21 @@ def main():
             lang=lang
         )
         if output:
+            print(output)
+        return
+
+    # Handle init command (doesn't need WorkflowController)
+    if args.command == "init":
+        if args.list_templates:
+            print(show_templates())
+        else:
+            output = init_project(
+                template=args.template,
+                project_name=args.name,
+                with_claude_md=not args.no_claude_md,
+                with_guide=not args.no_guide,
+                force=args.force
+            )
             print(output)
         return
 
