@@ -578,7 +578,21 @@ def init_project(
     workflow_dir.mkdir(exist_ok=True)
     state_path = workflow_dir / "state.json"
 
+    # Determine initial stage from existing workflow.yaml or template
     initial_stage = "START" if template == "simple" else "M0"
+    if workflow_path.exists():
+        try:
+            import yaml
+            with open(workflow_path, 'r', encoding='utf-8') as f:
+                existing_config = yaml.safe_load(f)
+            if existing_config and 'stages' in existing_config:
+                # Use first stage from existing workflow.yaml
+                first_stage = list(existing_config['stages'].keys())[0]
+                initial_stage = first_stage
+                results.append(f"ℹ️  Using first stage from workflow.yaml: {first_stage}")
+        except Exception:
+            pass  # Fall back to template default
+
     if state_path.exists() and not force:
         results.append(f"⚠️  .workflow/state.json already exists")
     else:

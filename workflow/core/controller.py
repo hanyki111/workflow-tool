@@ -41,31 +41,44 @@ class WorkflowController:
     def status(self) -> str:
         if not self.state.current_stage:
             return "Workflow not initialized. Use 'set' command."
-        
+
         stage = self.engine.current_stage
         if not stage:
             return f"Error: Current stage '{self.state.current_stage}' not found in config."
-        
+
         header_title = stage.label
-        guide_items = self.parser.extract_checklist(header_title)
-        
+
+        # Priority: workflow.yaml checklist > PROJECT_MANAGEMENT_GUIDE.md
+        if stage.checklist:
+            # Use checklist from workflow.yaml (supports both string and ChecklistItemConfig)
+            guide_items = []
+            for item in stage.checklist:
+                if isinstance(item, str):
+                    guide_items.append(CheckItem(text=item, checked=False))
+                else:
+                    # ChecklistItemConfig object
+                    guide_items.append(CheckItem(text=item.text, checked=False))
+        else:
+            # Fallback to PROJECT_MANAGEMENT_GUIDE.md
+            guide_items = self.parser.extract_checklist(header_title)
+
         checked_map = {item.text: item.checked for item in self.state.checklist}
         evidence_map = {item.text: item.evidence for item in self.state.checklist}
         agent_map = {item.text: item.required_agent for item in self.state.checklist}
-        
+
         merged_list = []
         for g_item in guide_items:
             is_checked = checked_map.get(g_item.text, g_item.checked)
             evidence = evidence_map.get(g_item.text, None)
-            
+
             # Extract [AGENT:name] tag
             required_agent = agent_map.get(g_item.text)
             agent_match = re.search(r'\[AGENT:([\w-]+)\]', g_item.text)
             if agent_match:
                 required_agent = agent_match.group(1)
-            
+
             merged_list.append(CheckItem(g_item.text, is_checked, evidence, required_agent))
-            
+
         self.state.checklist = merged_list
         self.state.save(self.config.state_file)
         
