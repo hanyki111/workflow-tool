@@ -602,39 +602,33 @@ flow status --help
 
 ### Stages
 
-**Stages are fully user-defined.** The workflow engine is agnostic to stage names - you can use any naming convention that fits your project.
+**Stages are fully user-defined.** The workflow engine uses a **flat stage dictionary** internally - there is no built-in hierarchy. "Depth" or "levels" are achieved purely through naming conventions.
 
-#### Example: Simple Workflow (4 stages)
+#### Example: Simple (4 stages)
 ```yaml
 stages:
-  START:    { label: "Project Start", ... }
-  DEVELOP:  { label: "Development", ... }
-  REVIEW:   { label: "Review", ... }
-  DONE:     { label: "Complete", ... }
+  START:   { label: "Project Start", ... }
+  DEVELOP: { label: "Development", ... }
+  REVIEW:  { label: "Review", ... }
+  DONE:    { label: "Complete", ... }
 ```
 
-#### Example: Full Workflow (M0-M4 + P1-P7)
+#### Example: 2-Level Depth (Milestone + Phase)
 ```yaml
 stages:
-  # Milestone stages
-  M0: { label: "Tech Debt Review", ... }
-  M1: { label: "Milestone Planning", ... }
-  M2: { label: "Milestone Discussion", ... }
-  M3: { label: "Branch Creation", ... }
-  M4: { label: "Milestone Closing", ... }
-  # Phase stages
-  P1: { label: "Phase Planning", ... }
-  P2: { label: "Phase Discussion", ... }
-  ...
+  M1: { label: "Planning", ... }
+  M2: { label: "Execution", ... }
+  P1: { label: "Design", ... }
+  P2: { label: "Implementation", ... }
 ```
 
-#### Example: Custom Workflow
+#### Example: 3-Level Depth (Project > Milestone > Task)
 ```yaml
 stages:
-  PLAN:     { label: "Planning", ... }
-  BUILD:    { label: "Building", ... }
-  TEST:     { label: "Testing", ... }
-  DEPLOY:   { label: "Deployment", ... }
+  P1_M1_T1: { label: "Project1 - Planning - Research", ... }
+  P1_M1_T2: { label: "Project1 - Planning - Design", ... }
+  P1_M2_T1: { label: "Project1 - Execution - Coding", ... }
+  P2_M1_T1: { label: "Project2 - Planning - Research", ... }
 ```
 
 Use `flow init --template simple` or `flow init --template full` to generate example workflows, then customize as needed.
