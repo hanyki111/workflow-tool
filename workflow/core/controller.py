@@ -403,23 +403,24 @@ class WorkflowController:
             valid_stages = list(self.config.stages.keys())
             return f"❌ Error: Invalid stage '{stage}'. Valid stages: {valid_stages}"
 
-        # Check for unchecked items in current checklist
-        unchecked = [i for i in self.state.checklist if not i.checked]
-        if unchecked:
-            if not force:
-                unchecked_texts = [f"  - {i.text}" for i in unchecked[:5]]
-                if len(unchecked) > 5:
-                    unchecked_texts.append(f"  ... and {len(unchecked) - 5} more")
-                return (
-                    f"❌ Cannot change stage: {len(unchecked)} unchecked items remain.\n"
-                    + "\n".join(unchecked_texts) + "\n\n"
-                    + "Use --force --token YOUR_TOKEN to override."
-                )
-            # Force requires token
+        # Always validate token when --force is used (security consistency)
+        if force:
             if not token:
                 return "❌ Error: --force requires USER-APPROVE token. Use: flow set STAGE --force --token YOUR_TOKEN"
             if not verify_token(token):
                 return "❌ Error: Invalid token for --force."
+
+        # Check for unchecked items in current checklist
+        unchecked = [i for i in self.state.checklist if not i.checked]
+        if unchecked and not force:
+            unchecked_texts = [f"  - {i.text}" for i in unchecked[:5]]
+            if len(unchecked) > 5:
+                unchecked_texts.append(f"  ... and {len(unchecked) - 5} more")
+            return (
+                f"❌ Cannot change stage: {len(unchecked)} unchecked items remain.\n"
+                + "\n".join(unchecked_texts) + "\n\n"
+                + "Use --force --token YOUR_TOKEN to override."
+            )
 
         # Record audit log if forcing with unchecked items
         if unchecked and force:
