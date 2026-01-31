@@ -1,0 +1,52 @@
+# 간단한 워크플로우 예시
+# 소규모 프로젝트를 위한 3단계 워크플로우
+
+version: "2.0"
+
+variables:
+  project_name: "simple-project"
+
+stages:
+  START:
+    id: "START"
+    label: "프로젝트 시작"
+    checklist:
+      - "프로젝트 범위 정의"
+      - "개발 환경 설정"
+      - "초기 파일 구조 생성"
+    transitions:
+      - target: "DEVELOP"
+        conditions:
+          - rule: all_checked
+            fail_message: "개발 시작 전 모든 시작 항목을 완료하세요"
+
+  DEVELOP:
+    id: "DEVELOP"
+    label: "개발"
+    checklist:
+      - "핵심 기능 구현"
+      - "기본 테스트 작성"
+      - "수동 테스트 수행"
+    transitions:
+      - target: "DONE"
+        conditions:
+          - rule: all_checked
+            fail_message: "모든 개발 항목을 완료하세요"
+
+  DONE:
+    id: "DONE"
+    label: "완료"
+    checklist:
+      - "문서 업데이트"
+      - "최종 검토"
+    transitions:
+      - target: "START"
+        conditions:
+          - rule: all_checked
+            fail_message: "마무리 항목을 완료하세요"
+
+# 룰셋 (재사용 가능한 조건 세트)
+rulesets:
+  all_checked:
+    - rule: all_checked
+      fail_message: "모든 체크리스트 항목을 완료해야 합니다"

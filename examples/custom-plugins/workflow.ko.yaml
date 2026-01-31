@@ -1,0 +1,148 @@
+# 커스텀 플러그인 워크플로우 예시
+# 커스텀 검증기 생성 및 사용 방법 시연
+
+version: "2.0"
+
+variables:
+  project_name: "custom-plugins-demo"
+  coverage_threshold: "80"
+
+# 커스텀 플러그인 등록
+# 참고: 커스텀 플러그인을 사용하려면 먼저 PYTHONPATH를 설정하세요:
+#   export PYTHONPATH="${PYTHONPATH}:$(pwd)"
+plugins:
+  # 내장 플러그인
+  fs: "workflow.plugins.fs.FileExistsValidator"
+  shell: "workflow.plugins.shell.CommandValidator"
+
+  # 커스텀 플러그인 (validators/custom.py에서)
+  # PYTHONPATH 설정 후 아래 주석을 해제하세요:
+  # git_branch: "validators.custom.GitBranchValidator"
+  # coverage: "validators.custom.CoverageValidator"
+  # deps_secure: "validators.custom.DependencyValidator"
+
+rulesets:
+  all_checked:
+    - rule: all_checked
+
+  quality_gates:
+    - rule: shell
+      args:
+        cmd: "ruff check ."
+        expect_code: 0
+      fail_message: "린팅 에러가 발견되었습니다"
+    - rule: coverage
+      args:
+        minimum: 80
+      fail_message: "테스트 커버리지가 80% 미만입니다"
+
+stages:
+  # ---------------------------------------------------------------------------
+  # SETUP: 초기 프로젝트 설정
+  # ---------------------------------------------------------------------------
+  SETUP:
+    id: "SETUP"
+    label: "프로젝트 설정"
+    checklist:
+      - "Git 저장소 초기화"
+      - "가상 환경 생성"
+      - "의존성 설치"
+    transitions:
+      - target: "DEVELOP"
+        conditions:
+          - use_ruleset: all_checked
+          - rule: fs
+            args:
+              path: "requirements.txt"
+            fail_message: "requirements.txt가 존재해야 합니다"
+
+  # ---------------------------------------------------------------------------
+  # DEVELOP: 브랜치 체크가 포함된 개발
+  # ---------------------------------------------------------------------------
+  DEVELOP:
+    id: "DEVELOP"
+    label: "개발"
+    checklist:
+      - "기능 브랜치 생성"
+      - "기능 구현"
+      - "테스트 작성"
+    transitions:
+      - target: "TEST"
+        conditions:
+          - use_ruleset: all_checked
+          # 커스텀 검증기: 기능 브랜치에 있는지 확인
+          # 데모용으로 주석 처리됨 - Git 설정 후 주석 해제
+          # - rule: git_branch
+          #   args:
+          #     pattern: "feature/*"
+          #   fail_message: "기능 브랜치에 있어야 합니다"
+
+  # ---------------------------------------------------------------------------
+  # TEST: 커버리지 검증이 포함된 테스트
+  # ---------------------------------------------------------------------------
+  TEST:
+    id: "TEST"
+    label: "테스트"
+    checklist:
+      - "단위 테스트 실행"
+      - "통합 테스트 실행"
+      - "테스트 커버리지 확인"
+    transitions:
+      - target: "SECURITY"
+        conditions:
+          - use_ruleset: all_checked
+          # 커스텀 검증기: 커버리지 임계값
+          # 데모용으로 주석 처리됨 - pytest-cov 설정 후 주석 해제
+          # - rule: coverage
+          #   args:
+          #     minimum: 80
+          #   fail_message: "테스트 커버리지가 최소 80% 이상이어야 합니다"
+
+  # ---------------------------------------------------------------------------
+  # SECURITY: 보안 검사
+  # ---------------------------------------------------------------------------
+  SECURITY:
+    id: "SECURITY"
+    label: "보안 검토"
+    checklist:
+      - "보안 취약점 검토"
+      - "의존성 취약점 확인"
+      - "코드에 비밀 정보 없음 확인"
+    transitions:
+      - target: "REVIEW"
+        conditions:
+          - use_ruleset: all_checked
+          # 커스텀 검증기: 의존성 보안
+          # 데모용으로 주석 처리됨 - safety 설치 후 주석 해제
+          # - rule: deps_secure
+          #   fail_message: "의존성에서 보안 취약점이 발견되었습니다"
+
+  # ---------------------------------------------------------------------------
+  # REVIEW: 코드 리뷰
+  # ---------------------------------------------------------------------------
+  REVIEW:
+    id: "REVIEW"
+    label: "코드 리뷰"
+    checklist:
+      - "셀프 리뷰 완료"
+      - "문서 업데이트"
+      - "[USER-APPROVE] 병합 승인"
+    transitions:
+      - target: "MERGE"
+        conditions:
+          - use_ruleset: all_checked
+
+  # ---------------------------------------------------------------------------
+  # MERGE: 병합 및 배포
+  # ---------------------------------------------------------------------------
+  MERGE:
+    id: "MERGE"
+    label: "병합 및 배포"
+    checklist:
+      - "메인 브랜치에 병합"
+      - "릴리스 버전 태그"
+      - "프로덕션 배포"
+    transitions:
+      - target: "SETUP"
+        conditions:
+          - use_ruleset: all_checked
