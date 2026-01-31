@@ -202,7 +202,8 @@ class WorkflowController:
             self.audit.logger.log_event("MANUAL_CHECK", log_data)
 
         self.state.save(self.config.state_file)
-        self.status()
+        # Note: Removed self.status() call here to avoid redundant state processing
+        # and potential timeout issues. The status will be updated on next status call.
         return "\n".join(results)
 
     def _get_item_config(self, stage_config, index: int) -> Optional[ChecklistItemConfig]:
@@ -291,7 +292,7 @@ class WorkflowController:
             if args and 'args' in self.context.data:
                 del self.context.data['args']
 
-    def next_stage(self, target: Optional[str] = None, force: bool = False, reason: str = "", token: Optional[str] = None) -> str:
+    def next_stage(self, target: Optional[str] = None, force: bool = False, reason: str = "", token: Optional[str] = None, skip_conditions: bool = False) -> str:
         """Attempts to move to the next stage after validating conditions."""
         if force:
             # Force requires USER-APPROVE token
@@ -322,15 +323,30 @@ class WorkflowController:
             transition = available[0]
 
         # 3. Validate Conditions (System Requirement)
-        self._update_context_from_state() 
+        self._update_context_from_state()
         resolved_conditions = self.engine.resolve_conditions(transition.conditions)
-        
+
         errors = []
         rule_results = []
+
+        # Skip plugin conditions (shell, fs, etc.) if skip_conditions flag is set
+        # but always validate all_checked and user_approved rules
+        skip_rules = {'shell', 'fs', 'file_exists', 'command'} if skip_conditions else set()
+
         for cond in resolved_conditions:
+            # Skip certain rules if skip_conditions is enabled
+            if cond.rule in skip_rules:
+                rule_results.append({
+                    "rule": cond.rule,
+                    "args": cond.args,
+                    "status": "SKIPPED",
+                    "reason": "skip_conditions flag"
+                })
+                continue
+
             validator_cls = self.registry.get(cond.rule)
             res_entry = {"rule": cond.rule, "args": cond.args}
-            
+
             if not validator_cls:
                 err_msg = f"Missing validator for rule '{cond.rule}'"
                 errors.append(err_msg)
@@ -340,7 +356,7 @@ class WorkflowController:
                 validator = validator_cls()
                 passed = validator.validate(cond.args, self.context.data)
                 res_entry["status"] = "PASS" if passed else "FAIL"
-                
+
                 # Add evidence if it's a file check
                 if cond.rule == "file_exists" and passed:
                     res_entry["hash"] = AuditLogger.get_file_hash(cond.args.get("path"))
@@ -349,9 +365,9 @@ class WorkflowController:
                     msg = cond.fail_message or f"Condition failed: {cond.rule} {cond.args}"
                     errors.append(msg)
                     res_entry["error"] = msg
-            
+
             rule_results.append(res_entry)
-        
+
         if errors and not force:
             return "Cannot proceed. System validation failed:\n" + "\n".join([f"❌ {e}" for e in errors])
 
@@ -372,7 +388,12 @@ class WorkflowController:
             reason=reason
         )
         
-        prefix = "⚠️ [FORCED] " if force else "✅ "
+        if force:
+            prefix = "⚠️ [FORCED] "
+        elif skip_conditions:
+            prefix = "⚠️ [SKIP-CONDITIONS] "
+        else:
+            prefix = "✅ "
         return f"{prefix}Transitioned to {transition.target}\n" + self.status()
 
     def set_stage(self, stage: str, module: Optional[str] = None, force: bool = False, token: Optional[str] = None) -> str:
@@ -424,6 +445,24 @@ class WorkflowController:
         if module:
             result += f" (module: {module})"
         return result + "\n" + self.status()
+
+    def set_module(self, module: str) -> str:
+        """Set active module without changing stage. Does not require --force."""
+        if not module or not module.strip():
+            return "❌ Error: Module name is required."
+
+        old_module = self.state.active_module
+        self.state.active_module = module
+        self.context.update("active_module", module)
+        self.state.save(self.config.state_file)
+
+        self.audit.logger.log_event("MODULE_CHANGE", {
+            "from_module": old_module,
+            "to_module": module,
+            "stage": self.state.current_stage
+        })
+
+        return f"✅ Module changed: {old_module} → {module}\n" + self.status()
 
     def _update_active_status_file(self, checklist_text: str, unchecked_indices: list = None):
         path = self.config.status_file

@@ -62,6 +62,11 @@ def main():
         "--token",
         help=t('help.next.token')
     )
+    next_parser.add_argument(
+        "--skip-conditions",
+        action="store_true",
+        help=t('help.next.skip_conditions')
+    )
 
     # Check
     check_parser = subparsers.add_parser(
@@ -139,6 +144,21 @@ def main():
     subparsers.add_parser(
         "secret-generate",
         help=t('help.secret_generate.description')
+    )
+
+    # Module (subcommand group)
+    module_parser = subparsers.add_parser(
+        "module",
+        help=t('help.module.description')
+    )
+    module_subparsers = module_parser.add_subparsers(dest="module_command")
+    module_set_parser = module_subparsers.add_parser(
+        "set",
+        help=t('help.module.set')
+    )
+    module_set_parser.add_argument(
+        "name",
+        help=t('help.module.name')
     )
 
     # Alias Install
@@ -246,7 +266,7 @@ def main():
         if args.command == "status":
             print(ctrl.status())
         elif args.command == "next":
-            print(ctrl.next_stage(args.target, force=args.force, reason=args.reason, token=args.token))
+            print(ctrl.next_stage(args.target, force=args.force, reason=args.reason, token=args.token, skip_conditions=args.skip_conditions))
         elif args.command == "check":
             print(ctrl.check(args.indices, token=args.token, evidence=args.evidence, args=args.args, skip_action=args.skip_action, agent=getattr(args, 'agent', None)))
         elif args.command == "set":
@@ -257,6 +277,11 @@ def main():
             generate_secret_interactive()
         elif args.command == "install-alias":
             install_alias(args.name)
+        elif args.command == "module":
+            if args.module_command == "set":
+                print(ctrl.set_module(args.name))
+            else:
+                print("Usage: flow module set <name>")
         else:
             parser.print_help()
 

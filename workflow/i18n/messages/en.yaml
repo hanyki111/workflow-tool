@@ -19,6 +19,7 @@ help:
     force: "Force transition skipping rules (requires --token)"
     reason: "Reason for forced transition"
     token: "USER-APPROVE token (required for --force)"
+    skip_conditions: "Skip plugin conditions (shell, fs) but still require all_checked"
 
   check:
     description: "Mark checklist items as done"
@@ -40,6 +41,11 @@ help:
     description: "Record sub-agent review"
     agent: "Agent name (e.g., spec-validator)"
     summary: "Summary of the review findings"
+
+  module:
+    description: "Module management commands"
+    set: "Set active module without changing stage"
+    name: "Module name to set as active"
 
   secret_generate:
     description: "Interactively generate SHA-256 secret hash"

@@ -19,6 +19,7 @@ help:
     force: "규칙을 건너뛰고 강제 전이 (--token 필요)"
     reason: "강제 전이 사유"
     token: "USER-APPROVE 토큰 (--force 사용 시 필수)"
+    skip_conditions: "플러그인 조건(shell, fs) 건너뛰기 (all_checked는 여전히 필요)"
 
   check:
     description: "체크리스트 항목 완료 표시"
@@ -40,6 +41,11 @@ help:
     description: "서브 에이전트 리뷰 기록"
     agent: "에이전트 이름 (예: spec-validator)"
     summary: "리뷰 결과 요약"
+
+  module:
+    description: "모듈 관리 명령"
+    set: "스테이지 변경 없이 활성 모듈 설정"
+    name: "활성화할 모듈 이름"
 
   secret_generate:
     description: "SHA-256 비밀 해시 대화형 생성"
