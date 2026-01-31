@@ -46,6 +46,9 @@ flow check 1 --evidence "모든 모듈 검토 완료, 심각한 부채 없음"
 
 # 액션 명령어에 인자 전달
 flow check 5 --args "feat: 사용자 인증 추가"
+
+# 태그로 체크 (쉘 래퍼 자동화용)
+flow check --tag "CMD:pytest"
 ```
 
 ### Active Workflow (액션 자동 실행)

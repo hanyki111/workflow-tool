@@ -46,6 +46,9 @@ flow check 1 --evidence "Reviewed all modules, no critical debt found"
 
 # Pass arguments to action commands
 flow check 5 --args "feat: add user authentication"
+
+# Check by tag (for shell wrapper automation)
+flow check --tag "CMD:pytest"
 ```
 
 ### Active Workflow (Action Execution)

@@ -24,6 +24,7 @@ help:
   check:
     description: "Mark checklist items as done"
     indices: "Item indices (1-based)"
+    tag: "Check items by tag (e.g., CMD:pytest) for shell wrapper automation"
     token: "Secret token for USER-APPROVE items"
     evidence: "Add audit evidence or justification"
     args: "Arguments for action command (e.g., commit message)"

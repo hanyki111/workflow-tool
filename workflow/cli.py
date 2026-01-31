@@ -76,8 +76,12 @@ def main():
     check_parser.add_argument(
         "indices",
         type=int,
-        nargs="+",
+        nargs="*",  # Optional when using --tag
         help=t('help.check.indices')
+    )
+    check_parser.add_argument(
+        "--tag", "-t",
+        help=t('help.check.tag')
     )
     check_parser.add_argument(
         "--token",
@@ -268,7 +272,14 @@ def main():
         elif args.command == "next":
             print(ctrl.next_stage(args.target, force=args.force, reason=args.reason, token=args.token, skip_conditions=args.skip_conditions))
         elif args.command == "check":
-            print(ctrl.check(args.indices, token=args.token, evidence=args.evidence, args=args.args, skip_action=args.skip_action, agent=getattr(args, 'agent', None)))
+            if args.tag:
+                # Tag-based check (for shell wrapper automation)
+                print(ctrl.check_by_tag(args.tag, evidence=args.evidence))
+            elif args.indices:
+                # Index-based check
+                print(ctrl.check(args.indices, token=args.token, evidence=args.evidence, args=args.args, skip_action=args.skip_action, agent=getattr(args, 'agent', None)))
+            else:
+                print("❌ Error: Either indices or --tag is required")
         elif args.command == "set":
             print(ctrl.set_stage(args.stage, module=args.module, force=args.force, token=args.token))
         elif args.command == "review":

@@ -146,6 +146,78 @@ chmod +x .gemini/hooks/auto-review.sh
 3. Hook extracts agent name, calls `flow review`
 4. `[AGENT:name]` items now pass `flow check`
 
+## Automated Checking with Shell Wrappers
+
+Automate checklist updates when specific CLI commands succeed using tags and shell wrappers.
+
+### Step 1: Add Tags to Checklist Items
+
+```yaml
+# workflow.yaml
+stages:
+  P3:
+    checklist:
+      - "[CMD:pytest] Run tests"
+      - "[CMD:memory-write] Save documentation with memory tool"
+      - "[CMD:lint] Run linter"
+```
+
+### Step 2: Create Shell Wrappers
+
+```bash
+# .bashrc or project/.envrc
+
+# pytest wrapper
+pytest() {
+    command pytest "$@"
+    [ $? -eq 0 ] && flow check --tag "CMD:pytest" 2>/dev/null
+}
+
+# memory_tool wrapper (subcommand-aware)
+memory_tool() {
+    command memory_tool "$@"
+    [ $? -eq 0 ] && case "$1" in
+        write|save) flow check --tag "CMD:memory-write" ;;
+    esac
+}
+
+# lint wrapper
+lint() {
+    command ruff check . "$@"
+    [ $? -eq 0 ] && flow check --tag "CMD:lint" 2>/dev/null
+}
+```
+
+### Step 3: Use Normally
+
+```bash
+# Run pytest normally - checklist auto-updates on success
+pytest tests/
+# ✅ Auto-checked: [CMD:pytest] Run tests
+
+# Memory tool - only 'write' subcommand triggers check
+memory_tool write docs/spec.md
+# ✅ Auto-checked: [CMD:memory-write] Save documentation with memory tool
+
+memory_tool read docs/spec.md
+# (no checklist update - read is not mapped)
+```
+
+### Tag Matching
+
+The `--tag` option finds and checks **all unchecked items** containing the tag:
+
+```bash
+flow check --tag "CMD:pytest"
+# Finds items containing "[CMD:pytest]" and checks them
+```
+
+**Benefits:**
+- Works for both AI and human-executed commands
+- Subcommand-aware (only specific actions trigger checks)
+- No need to know item index numbers
+- Explicit tags prevent accidental matches
+
 ## Variables
 
 Define project-wide variables:

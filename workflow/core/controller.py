@@ -206,6 +206,49 @@ class WorkflowController:
         # and potential timeout issues. The status will be updated on next status call.
         return "\n".join(results)
 
+    def check_by_tag(self, tag: str, evidence: Optional[str] = None) -> str:
+        """
+        Find and check items matching a specific tag pattern.
+
+        Tags in checklist items look like: [CMD:pytest], [CMD:memory-write], etc.
+        This enables automated checking via shell wrappers.
+
+        Args:
+            tag: Tag to match (e.g., "CMD:pytest" matches "[CMD:pytest]")
+            evidence: Optional evidence to attach
+
+        Returns:
+            Result message
+        """
+        # Normalize tag format
+        if not tag.startswith("["):
+            tag = f"[{tag}]"
+        if not tag.endswith("]"):
+            tag = f"{tag}]"
+
+        # Find matching unchecked items
+        matching_indices = []
+        for i, item in enumerate(self.state.checklist):
+            if not item.checked and tag in item.text:
+                matching_indices.append(i + 1)  # 1-based index
+
+        if not matching_indices:
+            return f"ℹ️  No unchecked items found with tag: {tag}"
+
+        if len(matching_indices) > 1:
+            # Multiple matches - check all of them
+            items_text = ", ".join([f"{i}" for i in matching_indices])
+            result = [f"ℹ️  Found {len(matching_indices)} items with tag {tag}: [{items_text}]"]
+        else:
+            result = []
+
+        # Check all matching items
+        auto_evidence = evidence or f"Auto-checked by tag {tag}"
+        check_result = self.check(matching_indices, evidence=auto_evidence)
+        result.append(check_result)
+
+        return "\n".join(result)
+
     def _get_item_config(self, stage_config, index: int) -> Optional[ChecklistItemConfig]:
         """Get checklist item config from stage definition."""
         if not stage_config or index >= len(stage_config.checklist):

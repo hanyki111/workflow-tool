@@ -146,6 +146,78 @@ chmod +x .gemini/hooks/auto-review.sh
 3. 훅이 에이전트 이름을 추출하고 `flow review` 호출
 4. `[AGENT:name]` 항목의 `flow check`가 이제 통과됨
 
+## 쉘 래퍼를 통한 자동 체크
+
+태그와 쉘 래퍼를 사용하여 특정 CLI 명령 성공 시 체크리스트를 자동 업데이트합니다.
+
+### 1단계: 체크리스트 항목에 태그 추가
+
+```yaml
+# workflow.yaml
+stages:
+  P3:
+    checklist:
+      - "[CMD:pytest] 테스트 실행"
+      - "[CMD:memory-write] memory tool로 문서 저장"
+      - "[CMD:lint] 린터 실행"
+```
+
+### 2단계: 쉘 래퍼 생성
+
+```bash
+# .bashrc 또는 프로젝트/.envrc
+
+# pytest 래퍼
+pytest() {
+    command pytest "$@"
+    [ $? -eq 0 ] && flow check --tag "CMD:pytest" 2>/dev/null
+}
+
+# memory_tool 래퍼 (서브커맨드 인식)
+memory_tool() {
+    command memory_tool "$@"
+    [ $? -eq 0 ] && case "$1" in
+        write|save) flow check --tag "CMD:memory-write" ;;
+    esac
+}
+
+# lint 래퍼
+lint() {
+    command ruff check . "$@"
+    [ $? -eq 0 ] && flow check --tag "CMD:lint" 2>/dev/null
+}
+```
+
+### 3단계: 평소처럼 사용
+
+```bash
+# pytest 실행 - 성공 시 체크리스트 자동 업데이트
+pytest tests/
+# ✅ 자동 체크: [CMD:pytest] 테스트 실행
+
+# memory tool - 'write' 서브커맨드만 체크 트리거
+memory_tool write docs/spec.md
+# ✅ 자동 체크: [CMD:memory-write] memory tool로 문서 저장
+
+memory_tool read docs/spec.md
+# (체크리스트 업데이트 없음 - read는 매핑되지 않음)
+```
+
+### 태그 매칭
+
+`--tag` 옵션은 해당 태그를 포함하는 **모든 미체크 항목**을 찾아 체크합니다:
+
+```bash
+flow check --tag "CMD:pytest"
+# "[CMD:pytest]"를 포함하는 항목을 찾아 체크
+```
+
+**장점:**
+- AI와 사용자 실행 모두 동작
+- 서브커맨드 인식 (특정 액션만 체크 트리거)
+- 항목 인덱스 번호를 알 필요 없음
+- 명시적 태그로 실수 방지
+
 ## 변수
 
 프로젝트 전체 변수 정의:
