@@ -600,66 +600,64 @@ flow status --help
 
 ## Workflow Concepts
 
-### Stage Types
+### Stages
 
-The workflow engine supports two levels of stages:
+**Stages are fully user-defined.** The workflow engine is agnostic to stage names - you can use any naming convention that fits your project.
 
-#### Milestone Stages (M0-M4)
+#### Example: Simple Workflow (4 stages)
+```yaml
+stages:
+  START:    { label: "Project Start", ... }
+  DEVELOP:  { label: "Development", ... }
+  REVIEW:   { label: "Review", ... }
+  DONE:     { label: "Complete", ... }
+```
 
-High-level project phases that span days to weeks:
+#### Example: Full Workflow (M0-M4 + P1-P7)
+```yaml
+stages:
+  # Milestone stages
+  M0: { label: "Tech Debt Review", ... }
+  M1: { label: "Milestone Planning", ... }
+  M2: { label: "Milestone Discussion", ... }
+  M3: { label: "Branch Creation", ... }
+  M4: { label: "Milestone Closing", ... }
+  # Phase stages
+  P1: { label: "Phase Planning", ... }
+  P2: { label: "Phase Discussion", ... }
+  ...
+```
 
-| Stage | Name                 | Purpose                            |
-| ----- | -------------------- | ---------------------------------- |
-| M0    | Tech Debt Review     | Assess and plan technical debt     |
-| M1    | Milestone Planning   | Create PRD, define scope           |
-| M2    | Milestone Discussion | Architecture review, user approval |
-| M3    | Branch Creation      | Git setup for the milestone        |
-| M4    | Milestone Closing    | Merge, document, celebrate         |
+#### Example: Custom Workflow
+```yaml
+stages:
+  PLAN:     { label: "Planning", ... }
+  BUILD:    { label: "Building", ... }
+  TEST:     { label: "Testing", ... }
+  DEPLOY:   { label: "Deployment", ... }
+```
 
-#### Phase Stages (P1-P7)
-
-Detailed implementation steps within each milestone:
-
-| Stage | Name             | Purpose                           |
-| ----- | ---------------- | --------------------------------- |
-| P1    | Phase Planning   | Define specific deliverables      |
-| P2    | Phase Discussion | Technical approach, user approval |
-| P3    | Spec             | Write technical specification     |
-| P4    | Implementation   | Write the code                    |
-| P5    | Testing          | Unit and integration tests        |
-| P6    | Self-Review      | Code quality check                |
-| P7    | Phase Closing    | Documentation sync, commit        |
+Use `flow init --template simple` or `flow init --template full` to generate example workflows, then customize as needed.
 
 ### Workflow Flow
 
+The flow between stages is defined by `transitions` in workflow.yaml:
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    MILESTONE LIFECYCLE                       │
+│                    EXAMPLE: LINEAR FLOW                      │
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
-│  ┌─ [Milestone Start] ────────────────────────────────────┐ │
-│  │  M0: Tech Debt Review                                  │ │
-│  │  M1: Milestone Planning                                │ │
-│  │  M2: Milestone Discussion                              │ │
-│  │  M3: Branch Creation                                   │ │
-│  └────────────────────────────────────────────────────────┘ │
-│                            │                                 │
-│                            ▼                                 │
-│  ┌─ [Phase Loop] ─────────────────────────────────────────┐ │
-│  │                                                         │ │
-│  │   Phase 1 ──► Phase 2 ──► Phase 3 ──► ...              │ │
-│  │      │           │           │                          │ │
-│  │      └───────────┴───────────┴──────────┐              │ │
-│  │                                          │              │ │
-│  │   For each phase:                        │              │ │
-│  │   P1 → P2 → P3 → P4 → P5 → P6 → P7 ─────┘              │ │
-│  │                                                         │ │
-│  └─────────────────────────────────────────────────────────┘ │
-│                            │                                 │
-│                            ▼                                 │
-│  ┌─ [Milestone End] ──────────────────────────────────────┐ │
-│  │  M4: Milestone Closing                                 │ │
-│  └────────────────────────────────────────────────────────┘ │
+│   START ──► DEVELOP ──► REVIEW ──► DONE ──► (loop back)     │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│              EXAMPLE: MILESTONE + PHASE FLOW                 │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│   M0 → M1 → M2 → M3 → [P1 → P2 → ... → P7] → M4 → (loop)   │
+│                        └─────── repeats ──────┘              │
 │                                                              │
 └─────────────────────────────────────────────────────────────┘
 ```
