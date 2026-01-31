@@ -165,6 +165,59 @@ conditions:
       cmd: "${test_command}"
 ```
 
+## Conditional Rules (when clause)
+
+Skip conditions based on context using the `when` clause:
+
+```yaml
+stages:
+  P3:
+    transitions:
+      - target: P4
+        conditions:
+          # Only check implementation directory for code modules
+          - rule: fs
+            when: '${active_module} not in ["roadmap", "docs", "planning"]'
+            args:
+              path: "src/${active_module}/"
+            fail_message: "Implementation directory not found"
+
+          # Only run tests for code modules
+          - rule: shell
+            when: '${active_module} not in ["roadmap", "docs"]'
+            args:
+              cmd: "pytest tests/${active_module}/"
+```
+
+### Supported Operators
+
+| Operator | Example | Description |
+|----------|---------|-------------|
+| `==` | `${var} == "value"` | Equality |
+| `!=` | `${var} != "value"` | Inequality |
+| `in` | `${var} in ["a", "b"]` | List membership |
+| `not in` | `${var} not in ["a", "b"]` | List non-membership |
+
+### Use Cases
+
+**Meta modules (roadmap, docs):** Skip code-related validations
+```yaml
+- rule: shell
+  when: '${active_module} != "roadmap"'
+  args:
+    cmd: "pytest"
+```
+
+**Stage-specific conditions:**
+```yaml
+- rule: fs
+  when: '${current_stage} == "P6"'
+  args:
+    path: "CHANGELOG.md"
+```
+
+When a `when` condition evaluates to false, the rule is marked as `SKIPPED` in the audit log.
+
 ## Stage Hooks (on_enter)
 
 Execute actions when entering a stage:

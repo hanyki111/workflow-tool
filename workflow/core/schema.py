@@ -7,6 +7,7 @@ class ConditionConfig:
     use_ruleset: Optional[str] = None
     args: Dict[str, Any] = field(default_factory=dict)
     fail_message: Optional[str] = None
+    when: Optional[str] = None  # Conditional expression, e.g., "${active_module} not in ['roadmap', 'docs']"
 
     def __post_init__(self):
         if not self.rule and not self.use_ruleset:

@@ -143,5 +143,6 @@ class ConfigParserV2:
             rule=data.get('rule'),
             use_ruleset=data.get('use_ruleset'),
             args=data.get('args', {}),
-            fail_message=data.get('fail_message')
+            fail_message=data.get('fail_message'),
+            when=data.get('when')
         )

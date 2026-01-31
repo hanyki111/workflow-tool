@@ -165,6 +165,59 @@ conditions:
       cmd: "${test_command}"
 ```
 
+## 조건부 규칙 (when 절)
+
+`when` 절을 사용하여 컨텍스트에 따라 조건을 건너뜁니다:
+
+```yaml
+stages:
+  P3:
+    transitions:
+      - target: P4
+        conditions:
+          # 코드 모듈에서만 구현 디렉토리 검사
+          - rule: fs
+            when: '${active_module} not in ["roadmap", "docs", "planning"]'
+            args:
+              path: "src/${active_module}/"
+            fail_message: "구현 디렉토리가 없습니다"
+
+          # 코드 모듈에서만 테스트 실행
+          - rule: shell
+            when: '${active_module} not in ["roadmap", "docs"]'
+            args:
+              cmd: "pytest tests/${active_module}/"
+```
+
+### 지원하는 연산자
+
+| 연산자 | 예시 | 설명 |
+|--------|------|------|
+| `==` | `${var} == "value"` | 동등 비교 |
+| `!=` | `${var} != "value"` | 불일치 비교 |
+| `in` | `${var} in ["a", "b"]` | 리스트 포함 |
+| `not in` | `${var} not in ["a", "b"]` | 리스트 미포함 |
+
+### 사용 사례
+
+**메타 모듈 (roadmap, docs):** 코드 관련 검증 건너뛰기
+```yaml
+- rule: shell
+  when: '${active_module} != "roadmap"'
+  args:
+    cmd: "pytest"
+```
+
+**스테이지별 조건:**
+```yaml
+- rule: fs
+  when: '${current_stage} == "P6"'
+  args:
+    path: "CHANGELOG.md"
+```
+
+`when` 조건이 false로 평가되면, 해당 규칙은 감사 로그에 `SKIPPED`로 기록됩니다.
+
 ## 스테이지 훅 (on_enter)
 
 스테이지 진입 시 작업 실행:

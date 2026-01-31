@@ -9,7 +9,7 @@ from .schema import WorkflowConfigV2, ChecklistItemConfig
 from .parser import GuideParser, ConfigParserV2
 from .engine import WorkflowEngine
 from .validator import ValidatorRegistry
-from .context import WorkflowContext
+from .context import WorkflowContext, WhenEvaluator
 from .audit import WorkflowAuditManager, AuditLogger
 from .auth import verify_token
 
@@ -333,6 +333,9 @@ class WorkflowController:
         # but always validate all_checked and user_approved rules
         skip_rules = {'shell', 'fs', 'file_exists', 'command'} if skip_conditions else set()
 
+        # Create evaluator for 'when' clauses
+        when_evaluator = WhenEvaluator(self.context.data)
+
         for cond in resolved_conditions:
             # Skip certain rules if skip_conditions is enabled
             if cond.rule in skip_rules:
@@ -343,6 +346,27 @@ class WorkflowController:
                     "reason": "skip_conditions flag"
                 })
                 continue
+
+            # Evaluate 'when' clause if present
+            if cond.when:
+                try:
+                    if not when_evaluator.evaluate(cond.when):
+                        rule_results.append({
+                            "rule": cond.rule,
+                            "args": cond.args,
+                            "status": "SKIPPED",
+                            "reason": f"when condition not met: {cond.when}"
+                        })
+                        continue
+                except ValueError as e:
+                    rule_results.append({
+                        "rule": cond.rule,
+                        "args": cond.args,
+                        "status": "ERROR",
+                        "error": f"Invalid when expression: {e}"
+                    })
+                    errors.append(f"Invalid when expression in {cond.rule}: {e}")
+                    continue
 
             validator_cls = self.registry.get(cond.rule)
             res_entry = {"rule": cond.rule, "args": cond.args}

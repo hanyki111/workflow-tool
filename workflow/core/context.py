@@ -1,7 +1,8 @@
+import ast
 import os
 import re
 import sys
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Union, Optional
 
 class ContextResolver:
     def __init__(self, context_data: Dict[str, Any]):
@@ -68,3 +69,105 @@ class WorkflowContext:
 
     def get_resolver(self) -> ContextResolver:
         return ContextResolver(self.data)
+
+
+class WhenEvaluator:
+    """
+    Evaluates simple conditional expressions for the 'when' clause.
+
+    Supported syntax:
+    - ${var} == "value"
+    - ${var} != "value"
+    - ${var} in ["a", "b", "c"]
+    - ${var} not in ["a", "b", "c"]
+
+    For safety, this uses a simple parser instead of eval().
+    """
+
+    def __init__(self, context_data: Dict[str, Any]):
+        self.context = context_data
+        self._var_pattern = re.compile(r'\$\{([^}]+)\}')
+
+    def evaluate(self, expression: str) -> bool:
+        """Evaluate a when expression and return True/False."""
+        if not expression or not expression.strip():
+            return True  # Empty expression = always true
+
+        expr = expression.strip()
+
+        # Resolve variables first
+        resolved = self._resolve_variables(expr)
+
+        # Parse and evaluate
+        return self._evaluate_expression(resolved)
+
+    def _resolve_variables(self, expr: str) -> str:
+        """Replace ${var} with actual values, quoted as strings."""
+        def replacer(match):
+            var_name = match.group(1)
+            value = self.context.get(var_name)
+            if value is None:
+                return '""'  # Treat None as empty string
+            # Return as quoted string for safe parsing
+            return repr(str(value))
+
+        return self._var_pattern.sub(replacer, expr)
+
+    def _evaluate_expression(self, expr: str) -> bool:
+        """Evaluate a resolved expression."""
+        # Handle 'not in' (must check before 'in')
+        if ' not in ' in expr:
+            parts = expr.split(' not in ', 1)
+            if len(parts) == 2:
+                left = self._parse_value(parts[0].strip())
+                right = self._parse_list(parts[1].strip())
+                return left not in right
+
+        # Handle 'in'
+        if ' in ' in expr:
+            parts = expr.split(' in ', 1)
+            if len(parts) == 2:
+                left = self._parse_value(parts[0].strip())
+                right = self._parse_list(parts[1].strip())
+                return left in right
+
+        # Handle '!='
+        if ' != ' in expr:
+            parts = expr.split(' != ', 1)
+            if len(parts) == 2:
+                left = self._parse_value(parts[0].strip())
+                right = self._parse_value(parts[1].strip())
+                return left != right
+
+        # Handle '=='
+        if ' == ' in expr:
+            parts = expr.split(' == ', 1)
+            if len(parts) == 2:
+                left = self._parse_value(parts[0].strip())
+                right = self._parse_value(parts[1].strip())
+                return left == right
+
+        # Unknown expression format
+        raise ValueError(f"Invalid when expression: {expr}")
+
+    def _parse_value(self, s: str) -> str:
+        """Parse a single value (string literal or bare word)."""
+        s = s.strip()
+        # Try to parse as Python literal (handles quoted strings)
+        try:
+            return ast.literal_eval(s)
+        except (ValueError, SyntaxError):
+            # Return as-is (bare word)
+            return s
+
+    def _parse_list(self, s: str) -> List[str]:
+        """Parse a list literal like ['a', 'b', 'c']."""
+        s = s.strip()
+        try:
+            result = ast.literal_eval(s)
+            if isinstance(result, (list, tuple, set)):
+                return list(result)
+            # Single value - wrap in list
+            return [result]
+        except (ValueError, SyntaxError):
+            raise ValueError(f"Invalid list syntax: {s}")

@@ -1271,6 +1271,35 @@ stages:
               cmd: "${test_cmd}"
 ```
 
+### 조건부 규칙 (when 절)
+
+`when` 절을 사용하여 컨텍스트에 따라 조건을 건너뜁니다:
+
+```yaml
+stages:
+  IMPLEMENT:
+    transitions:
+      - target: "REVIEW"
+        conditions:
+          # 코드 모듈에서만 구현 디렉토리 검사
+          - rule: fs
+            when: '${active_module} not in ["roadmap", "docs"]'
+            args:
+              path: "src/${active_module}/"
+
+          # 코드 모듈에서만 테스트 실행
+          - rule: shell
+            when: '${active_module} not in ["roadmap", "docs"]'
+            args:
+              cmd: "pytest tests/${active_module}/"
+```
+
+**지원하는 연산자:**
+- `==`, `!=` - 동등/불일치 비교
+- `in`, `not in` - 리스트 멤버십
+
+`when` 조건이 false로 평가되면, 해당 규칙은 감사 로그에 `SKIPPED`로 기록됩니다.
+
 ---
 
 ## 다국어 지원

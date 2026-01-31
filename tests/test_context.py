@@ -2,7 +2,7 @@
 import os
 import sys
 import pytest
-from workflow.core.context import WorkflowContext, ContextResolver
+from workflow.core.context import WorkflowContext, ContextResolver, WhenEvaluator
 
 
 class TestBuiltinVariables:
@@ -174,3 +174,78 @@ class TestCommandExecution:
             env=os.environ.copy()
         )
         assert result.returncode == 0
+
+
+class TestWhenEvaluator:
+    """Test conditional expression evaluation for 'when' clauses."""
+
+    def test_empty_expression_returns_true(self):
+        """Empty or None expression should return True."""
+        evaluator = WhenEvaluator({})
+        assert evaluator.evaluate("") is True
+        assert evaluator.evaluate("   ") is True
+        assert evaluator.evaluate(None) is True
+
+    def test_equality_operator(self):
+        """== operator should work correctly."""
+        evaluator = WhenEvaluator({"active_module": "core"})
+
+        assert evaluator.evaluate('${active_module} == "core"') is True
+        assert evaluator.evaluate('${active_module} == "roadmap"') is False
+
+    def test_inequality_operator(self):
+        """!= operator should work correctly."""
+        evaluator = WhenEvaluator({"active_module": "core"})
+
+        assert evaluator.evaluate('${active_module} != "roadmap"') is True
+        assert evaluator.evaluate('${active_module} != "core"') is False
+
+    def test_in_operator(self):
+        """'in' operator should check list membership."""
+        evaluator = WhenEvaluator({"active_module": "core"})
+
+        assert evaluator.evaluate('${active_module} in ["core", "inventory"]') is True
+        assert evaluator.evaluate('${active_module} in ["roadmap", "docs"]') is False
+
+    def test_not_in_operator(self):
+        """'not in' operator should check list non-membership."""
+        evaluator = WhenEvaluator({"active_module": "roadmap"})
+
+        assert evaluator.evaluate('${active_module} not in ["core", "inventory"]') is True
+        assert evaluator.evaluate('${active_module} not in ["roadmap", "docs"]') is False
+
+    def test_undefined_variable(self):
+        """Undefined variables should be treated as empty string."""
+        evaluator = WhenEvaluator({})
+
+        assert evaluator.evaluate('${undefined_var} == ""') is True
+        assert evaluator.evaluate('${undefined_var} != "something"') is True
+
+    def test_single_quotes_in_list(self):
+        """Single quotes in lists should work."""
+        evaluator = WhenEvaluator({"module": "api"})
+
+        assert evaluator.evaluate("${module} in ['api', 'web']") is True
+        assert evaluator.evaluate("${module} not in ['cli', 'core']") is True
+
+    def test_invalid_expression_raises_error(self):
+        """Invalid expressions should raise ValueError."""
+        evaluator = WhenEvaluator({"module": "test"})
+
+        with pytest.raises(ValueError):
+            evaluator.evaluate("this is not valid")
+
+    def test_realistic_use_case(self):
+        """Test realistic workflow condition."""
+        # Meta module should skip implementation checks
+        context = {"active_module": "roadmap", "current_stage": "P3"}
+        evaluator = WhenEvaluator(context)
+
+        # This condition would be on a has_impl/fs rule
+        condition = '${active_module} not in ["roadmap", "docs", "planning"]'
+        assert evaluator.evaluate(condition) is False  # Should skip
+
+        # Code module should run checks
+        context["active_module"] = "core-engine"
+        evaluator = WhenEvaluator(context)
+        assert evaluator.evaluate(condition) is True  # Should run
