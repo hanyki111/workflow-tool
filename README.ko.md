@@ -440,13 +440,25 @@ flow next
 # 대상 스테이지 명시적 지정
 flow next M1
 
-# 강제 전이 (모든 조건 우회)
-flow next --force --reason "긴급 핫픽스 필요"
+# 플러그인 조건(shell, fs) 건너뛰기 (체크리스트는 여전히 필요)
+flow next --skip-conditions
+
+# 강제 전이 (모든 조건 우회, 토큰 필요)
+flow next --force --token "your-secret" --reason "긴급 핫픽스 필요"
 
 # 가능한 출력:
 # 성공: "✅ Transitioned to M1: 계획"
+# 스킵: "⚠️ [SKIP-CONDITIONS] Transitioned to P5"
 # 차단: "Cannot proceed. Unchecked items: ..."
 ```
+
+**옵션 비교:**
+
+| 옵션 | 체크리스트 필요 | 플러그인 조건 | 토큰 필요 |
+|------|----------------|---------------|-----------|
+| (없음) | ✅ 예 | ✅ 예 | 아니오 |
+| `--skip-conditions` | ✅ 예 | ❌ 건너뜀 | 아니오 |
+| `--force` | ❌ 아니오 | ❌ 아니오 | ✅ 예 |
 
 ### `flow set`
 
@@ -463,6 +475,19 @@ flow set P3 --module inventory-system
 # - 상태 손상 후 복구
 # - 특정 지점으로 점프
 # - 특정 스테이지 테스트
+```
+
+### `flow module set`
+
+스테이지 변경 없이 활성 모듈 변경. 미완료 항목이 있어도 **`--force` 불필요**.
+
+```bash
+# 현재 스테이지 유지하며 모듈 변경
+flow module set inventory-system
+
+# 용도:
+# - 새 페이즈 시작 시(P1) 컨텍스트 전환
+# - 체크리스트 초기화 없이 다른 모듈 작업
 ```
 
 ### `flow review`

@@ -465,13 +465,25 @@ flow next
 # Specify target stage explicitly
 flow next M1
 
-# Force transition (bypasses all conditions)
-flow next --force --reason "Emergency hotfix required"
+# Skip plugin conditions (shell, fs) but still require all items checked
+flow next --skip-conditions
+
+# Force transition (bypasses all conditions, requires token)
+flow next --force --token "your-secret" --reason "Emergency hotfix required"
 
 # Possible outputs:
-# Success: "Transitioned to M1: Planning"
-# Blocked: "Cannot transition: All checklist items must be completed"
+# Success: "✅ Transitioned to M1: Planning"
+# Skip:    "⚠️ [SKIP-CONDITIONS] Transitioned to P5"
+# Blocked: "Cannot proceed. Unchecked items: ..."
 ```
+
+**Options comparison:**
+
+| Option | Checklist Required | Plugin Conditions | Token Required |
+|--------|-------------------|-------------------|----------------|
+| (none) | ✅ Yes | ✅ Yes | No |
+| `--skip-conditions` | ✅ Yes | ❌ Skipped | No |
+| `--force` | ❌ No | ❌ No | ✅ Yes |
 
 ### `flow set`
 
@@ -488,6 +500,19 @@ flow set P3 --module inventory-system
 # - Resuming after state corruption
 # - Jumping to a specific point
 # - Testing specific stages
+```
+
+### `flow module set`
+
+Change active module without changing stage. **Does not require `--force`** even if there are unchecked items.
+
+```bash
+# Change module while keeping current stage
+flow module set inventory-system
+
+# Useful for:
+# - Switching context at start of new phase (P1)
+# - Working on different module without resetting checklist
 ```
 
 ### `flow review`

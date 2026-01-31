@@ -79,16 +79,28 @@ flow next
 # Specify target stage
 flow next M1
 
-# Force transition (skips rules)
-flow next --force --reason "Emergency hotfix needed"
+# Skip plugin conditions (shell, fs) but require checklist complete
+flow next --skip-conditions
+
+# Force transition (skips all rules, requires token)
+flow next --force --token "secret" --reason "Emergency hotfix needed"
 ```
+
+### Transition Options
+
+| Option | Checklist | Conditions | Token |
+|--------|-----------|------------|-------|
+| (none) | Required | Required | No |
+| `--skip-conditions` | Required | Skipped | No |
+| `--force` | Skipped | Skipped | Yes |
 
 ### Transition Errors
 
 If conditions aren't met:
 ```
-Cannot transition: All checklist items must be completed
-Remaining items: 2, 3
+Cannot proceed. Unchecked items:
+- Review discovered debts with user
+- Decide which debts to address
 ```
 
 ## Set Command
@@ -101,6 +113,17 @@ flow set M2
 
 # Set stage and module
 flow set P3 --module inventory-system
+```
+
+## Module Command
+
+Change module without changing stage (no `--force` needed):
+
+```bash
+# Switch active module
+flow module set inventory-system
+
+# Useful when starting new phase work on different module
 ```
 
 ## Command Combinations

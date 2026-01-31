@@ -79,16 +79,28 @@ flow next
 # 대상 스테이지 지정
 flow next M1
 
-# 강제 전이 (규칙 건너뜀)
-flow next --force --reason "긴급 핫픽스 필요"
+# 플러그인 조건(shell, fs) 건너뛰기 (체크리스트는 필요)
+flow next --skip-conditions
+
+# 강제 전이 (모든 규칙 건너뜀, 토큰 필요)
+flow next --force --token "secret" --reason "긴급 핫픽스 필요"
 ```
+
+### 전이 옵션
+
+| 옵션 | 체크리스트 | 조건 | 토큰 |
+|------|-----------|------|------|
+| (없음) | 필요 | 필요 | 아니오 |
+| `--skip-conditions` | 필요 | 건너뜀 | 아니오 |
+| `--force` | 건너뜀 | 건너뜀 | 예 |
 
 ### 전이 오류
 
 조건이 충족되지 않은 경우:
 ```
-전이 불가: 모든 체크리스트 항목을 완료해야 합니다
-남은 항목: 2, 3
+Cannot proceed. Unchecked items:
+- 사용자와 함께 발견된 부채 검토
+- 이번 마일스톤에서 해결할 부채 결정
 ```
 
 ## Set 명령어
@@ -101,6 +113,17 @@ flow set M2
 
 # 스테이지와 모듈 설정
 flow set P3 --module inventory-system
+```
+
+## Module 명령어
+
+스테이지 변경 없이 모듈 변경 (`--force` 불필요):
+
+```bash
+# 활성 모듈 전환
+flow module set inventory-system
+
+# 새 페이즈 시작 시 다른 모듈로 작업할 때 유용
 ```
 
 ## 명령어 조합
