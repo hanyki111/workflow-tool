@@ -515,6 +515,7 @@ flow check 1 --agent plan-critic
 ### `flow secret-generate`
 
 USER-APPROVE 항목용 비밀 생성.
+
 ** 중요 !! ** : [USER-APPROVE] 항목의 check나 --force 명령어 등의 경우 --token 을 통해 사용자만이 알고 있는 비밀번호를 요구합니다. 이 부분을 claude나 gemini 등의 interactive 모드에서 shell 명령어를 통해 토큰을 전달하여 사용하는 경우, 토큰이 AI에게 노출되어 향후 AI가 사용자의 승인을 얻지 않은 채로 체크를 진행할 수 있습니다. 반드시 별도의 터미널에서 실행하세요.
 
 ```bash

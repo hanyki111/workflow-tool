@@ -540,6 +540,7 @@ This automatically registers the agent review before checking the item.
 ### `flow secret-generate`
 
 Create a secret for USER-APPROVE items.
+
 ** IMPORTANT !! ** : [USER-APPROVE] check, --force option requires secret token. If you send your secret by interactive shell running inside claude-cli or gemini-cli, secret token will be exposed to AI and then AI will bypass [USER-APPROVE] or --force option without your approve. you MUST send a secret token via additional terminal.
 
 ```bash
