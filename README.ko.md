@@ -274,8 +274,6 @@ my-project/
 │   ├── secret              # USER-APPROVE용 비밀 해시 (gitignore)
 │   ├── audit/              # 작업 감사 로그 (gitignore)
 │   │   └── workflow.log
-│   ├── docs/               # 워크플로우 문서
-│   │   └── PROJECT_MANAGEMENT_GUIDE.md
 │   └── ACTIVE_STATUS.md    # AI 상태 훅 (자동 생성, gitignore)
 ├── CLAUDE.md               # AI 에이전트 지침 (선택)
 └── ... (프로젝트 파일들)
@@ -300,10 +298,9 @@ plugins:
   shell: "workflow.plugins.shell.CommandValidator"
 
 # 경로 설정 (선택, 모두 .workflow/ 기본값)
-docs_dir: ".workflow/docs" # 문서 디렉토리
-audit_dir: ".workflow/audit" # 감사 로그 디렉토리
-status_file: ".workflow/ACTIVE_STATUS.md" # AI 상태 훅 파일
-guide_file: ".workflow/docs/PROJECT_MANAGEMENT_GUIDE.md" # 가이드 파일
+audit_dir: ".workflow/audit"           # 감사 로그 디렉토리
+status_file: ".workflow/ACTIVE_STATUS.md"  # AI 상태 훅 파일
+guide_file: "docs/WORKFLOW_GUIDE.md"   # 체크리스트 동기화용 가이드 파일 (선택)
 
 # 재사용 가능한 조건 세트 (선택)
 rulesets:
@@ -960,7 +957,7 @@ flow status
 
 위치: `examples/full-project/`
 
-PROJECT_MANAGEMENT_GUIDE.md와 일치하는 완전한 M0-M4, P1-P7 워크플로우:
+완전한 M0-M4, P1-P7 듀얼 트랙 워크플로우 예시:
 
 ```bash
 cd examples/full-project
@@ -1068,6 +1065,47 @@ flow check 2 --skip-action
 | 검증 없음             | 명령 성공 필수 (exit 0)      |
 | 건너뛰기 쉬움         | 강제 실행                    |
 | 수동 감사             | 자동 감사 추적               |
+
+### 가이드 파일 통합 (체크리스트 동기화)
+
+기존 프로젝트 문서(예: `CONTRIBUTING.md`, `WORKFLOW.md` 등 마크다운 파일)에서 체크리스트를 동기화합니다. 엔진이 스테이지 라벨과 일치하는 헤더의 마크다운 체크박스를 파싱합니다.
+
+**설정:**
+
+```yaml
+# workflow.yaml
+guide_file: "docs/WORKFLOW_GUIDE.md"  # 마크다운 문서 경로
+
+stages:
+  REVIEW:
+    label: "코드 리뷰"    # guide_file의 헤더와 매칭
+    checklist: []         # 비어있음 - guide_file에서 동기화됨
+```
+
+**가이드 파일 예시 (`docs/WORKFLOW_GUIDE.md`):**
+
+```markdown
+## 코드 리뷰
+
+머지 전 확인사항:
+
+- [ ] 모든 테스트 통과
+- [ ] 스타일 가이드 준수
+- [ ] [USER-APPROVE] 보안 리뷰 완료
+- [ ] 문서 업데이트
+```
+
+**작동 방식:**
+
+1. 스테이지 진입 시 엔진이 스테이지 라벨을 포함하는 헤더를 찾음
+2. 해당 헤더 아래의 모든 마크다운 체크박스(`- [ ]` 또는 `- [x]`)를 추출
+3. 스테이지의 체크리스트로 동기화
+
+**장점:**
+
+- 프로젝트 워크플로우 문서의 단일 진실 공급원
+- 비기술 이해관계자도 가이드 파일 편집 가능
+- 워크플로우가 문서와 자동으로 동기화 유지
 
 ### AI CLI Hook 통합 (Claude Code / Gemini CLI)
 

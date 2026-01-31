@@ -49,6 +49,6 @@ class WorkflowConfigV2:
     status_file: str = ".workflow/ACTIVE_STATUS.md"  # Status file for AI hooks
 
     # File paths (computed from dirs or explicit)
-    guide_file: str = ".workflow/docs/PROJECT_MANAGEMENT_GUIDE.md"
+    guide_file: str = ""  # Optional: path to markdown guide for checklist sync
     state_file: str = ".workflow/state.json"
     secret_file: str = ".workflow/secret"

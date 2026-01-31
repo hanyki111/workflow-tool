@@ -92,8 +92,6 @@ my-project/
 ├── workflow.yaml        # 워크플로우 정의
 ├── .workflow/
 │   ├── state.json       # 현재 상태
-│   ├── docs/            # 워크플로우 문서
-│   │   └── PROJECT_MANAGEMENT_GUIDE.md
 │   ├── audit/           # 감사 로그 (자동 생성)
 │   └── ACTIVE_STATUS.md # AI 상태 훅 (자동 생성)
 └── CLAUDE.md            # AI 지침 (선택)
@@ -104,11 +102,10 @@ my-project/
 workflow.yaml에서 경로를 커스터마이즈할 수 있습니다:
 
 ```yaml
-# 기본 경로 (모두 .workflow/ 내부)
-docs_dir: ".workflow/docs"
+# 기본 경로
 audit_dir: ".workflow/audit"
 status_file: ".workflow/ACTIVE_STATUS.md"
-guide_file: ".workflow/docs/PROJECT_MANAGEMENT_GUIDE.md"
+guide_file: "docs/WORKFLOW_GUIDE.md"  # 선택: 마크다운에서 체크리스트 동기화
 ```
 
 다음: 기본 명령어를 배워봅시다!

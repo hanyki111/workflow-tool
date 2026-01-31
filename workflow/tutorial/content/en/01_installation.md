@@ -92,8 +92,6 @@ my-project/
 ├── workflow.yaml        # Workflow definition
 ├── .workflow/
 │   ├── state.json       # Current state
-│   ├── docs/            # Workflow documentation
-│   │   └── PROJECT_MANAGEMENT_GUIDE.md
 │   ├── audit/           # Audit logs (auto-created)
 │   └── ACTIVE_STATUS.md # AI status hook (auto-created)
 └── CLAUDE.md            # AI instructions (optional)
@@ -104,11 +102,10 @@ my-project/
 Customize paths in workflow.yaml:
 
 ```yaml
-# Default paths (all within .workflow/)
-docs_dir: ".workflow/docs"
+# Default paths
 audit_dir: ".workflow/audit"
 status_file: ".workflow/ACTIVE_STATUS.md"
-guide_file: ".workflow/docs/PROJECT_MANAGEMENT_GUIDE.md"
+guide_file: "docs/WORKFLOW_GUIDE.md"  # Optional: sync checklists from markdown
 ```
 
 Next: Learn about basic commands!

@@ -267,4 +267,3 @@ Have a useful workflow pattern? Contribute it!
 
 - Main [README.md](../README.md) for full documentation
 - [Tutorial](../workflow/tutorial/) for learning materials
-- [PROJECT_MANAGEMENT_GUIDE.md](../.workflow/docs/PROJECT_MANAGEMENT_GUIDE.md) for the full methodology

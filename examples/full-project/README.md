@@ -1,6 +1,6 @@
 # Full Project Workflow Example
 
-A complete dual-track workflow implementing the full PROJECT_MANAGEMENT_GUIDE methodology.
+A complete dual-track workflow demonstrating the M0-M4 + P1-P7 methodology.
 
 ## Overview
 

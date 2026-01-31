@@ -272,8 +272,6 @@ my-project/
 │   ├── secret              # Secret hash for USER-APPROVE (gitignored)
 │   ├── audit/              # Action audit logs (gitignored)
 │   │   └── workflow.log
-│   ├── docs/               # Workflow documentation
-│   │   └── PROJECT_MANAGEMENT_GUIDE.md
 │   └── ACTIVE_STATUS.md    # AI status hook (auto-created, gitignored)
 ├── CLAUDE.md               # AI agent instructions (optional)
 └── ... (your project files)
@@ -298,10 +296,9 @@ plugins:
   shell: "workflow.plugins.shell.CommandValidator"
 
 # Path configuration (optional, all default to .workflow/)
-docs_dir: ".workflow/docs" # Documentation directory
-audit_dir: ".workflow/audit" # Audit log directory
-status_file: ".workflow/ACTIVE_STATUS.md" # AI status hook file
-guide_file: ".workflow/docs/PROJECT_MANAGEMENT_GUIDE.md" # Guide file
+audit_dir: ".workflow/audit"           # Audit log directory
+status_file: ".workflow/ACTIVE_STATUS.md"  # AI status hook file
+guide_file: "docs/WORKFLOW_GUIDE.md"   # Guide file for checklist sync (optional)
 
 # Reusable condition sets (optional)
 rulesets:
@@ -805,7 +802,7 @@ flow status
 
 Location: `examples/full-project/`
 
-Complete M0-M4, P1-P7 workflow matching PROJECT_MANAGEMENT_GUIDE.md:
+Complete M0-M4, P1-P7 dual-track workflow example:
 
 ```bash
 cd examples/full-project
@@ -913,6 +910,47 @@ flow check 2 --skip-action
 | No verification       | Command must succeed (exit 0)  |
 | Easy to skip          | Enforced execution             |
 | Manual audit          | Automatic audit trail          |
+
+### Guide File Integration (Checklist Sync)
+
+Sync checklists from your existing project documentation (e.g., `CONTRIBUTING.md`, `WORKFLOW.md`, or any markdown file). The engine parses markdown checkboxes from headers matching the stage label.
+
+**Configuration:**
+
+```yaml
+# workflow.yaml
+guide_file: "docs/WORKFLOW_GUIDE.md"  # Path to your markdown document
+
+stages:
+  REVIEW:
+    label: "Code Review"  # Matches header in guide_file
+    checklist: []         # Empty - will sync from guide_file
+```
+
+**Guide File Example (`docs/WORKFLOW_GUIDE.md`):**
+
+```markdown
+## Code Review
+
+Before merging, ensure:
+
+- [ ] All tests pass
+- [ ] Code follows style guide
+- [ ] [USER-APPROVE] Security review completed
+- [ ] Documentation updated
+```
+
+**How It Works:**
+
+1. When entering a stage, the engine looks for a header containing the stage label
+2. Extracts all markdown checkboxes (`- [ ]` or `- [x]`) below that header
+3. Syncs them as the stage's checklist
+
+**Benefits:**
+
+- Single source of truth for project workflow documentation
+- Non-technical stakeholders can edit the guide file
+- Workflow stays in sync with documentation automatically
 
 ### AI CLI Hook Integration (Claude Code / Gemini CLI)
 

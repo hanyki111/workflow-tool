@@ -80,6 +80,31 @@ stages:
           - use_ruleset: ready_for_deploy
 ```
 
+## Guide File Integration
+
+Sync checklists from your project documentation (any markdown file):
+
+```yaml
+# workflow.yaml
+guide_file: "docs/WORKFLOW_GUIDE.md"
+
+stages:
+  REVIEW:
+    label: "Code Review"  # Matches header in guide file
+    checklist: []         # Empty - synced from guide file
+```
+
+**Guide file (`docs/WORKFLOW_GUIDE.md`):**
+```markdown
+## Code Review
+
+- [ ] All tests pass
+- [ ] Code follows style guide
+- [ ] [USER-APPROVE] Security review
+```
+
+The engine finds the header matching the stage label and extracts checkboxes below it.
+
 ## Sub-Agent Reviews
 
 Record AI sub-agent reviews:

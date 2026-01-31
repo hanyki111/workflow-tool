@@ -80,6 +80,31 @@ stages:
           - use_ruleset: ready_for_deploy
 ```
 
+## 가이드 파일 통합
+
+프로젝트 문서(마크다운 파일)에서 체크리스트를 동기화:
+
+```yaml
+# workflow.yaml
+guide_file: "docs/WORKFLOW_GUIDE.md"
+
+stages:
+  REVIEW:
+    label: "코드 리뷰"    # 가이드 파일의 헤더와 매칭
+    checklist: []         # 비어있음 - 가이드 파일에서 동기화
+```
+
+**가이드 파일 (`docs/WORKFLOW_GUIDE.md`):**
+```markdown
+## 코드 리뷰
+
+- [ ] 모든 테스트 통과
+- [ ] 스타일 가이드 준수
+- [ ] [USER-APPROVE] 보안 리뷰
+```
+
+엔진이 스테이지 라벨과 일치하는 헤더를 찾아 그 아래의 체크박스를 추출합니다.
+
 ## 서브 에이전트 리뷰
 
 AI 서브 에이전트 리뷰 기록:

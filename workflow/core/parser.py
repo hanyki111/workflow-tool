@@ -11,8 +11,13 @@ class GuideParser:
 
     @classmethod
     def from_file(cls, path: str) -> 'GuideParser':
-        with open(path, 'r', encoding='utf-8') as f:
-            return cls(f.read())
+        if not path:
+            return cls("")  # Empty parser when no guide file configured
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                return cls(f.read())
+        except FileNotFoundError:
+            return cls("")  # Empty parser if file doesn't exist
 
     def extract_checklist(self, header_keyword: str) -> List[CheckItem]:
         """
@@ -96,8 +101,8 @@ class ConfigParserV2:
         audit_dir = data.get('audit_dir', ".workflow/audit")
         status_file = data.get('status_file', ".workflow/ACTIVE_STATUS.md")
 
-        # guide_file can be explicit or derived from docs_dir
-        guide_file = data.get('guide_file', f"{docs_dir}/PROJECT_MANAGEMENT_GUIDE.md")
+        # guide_file is optional - only set if explicitly configured
+        guide_file = data.get('guide_file', "")
 
         config = WorkflowConfigV2(
             version=str(data.get('version', '1.0')),

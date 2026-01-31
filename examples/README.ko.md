@@ -268,4 +268,3 @@ flow status
 
 - 전체 문서는 메인 [README.md](../README.md) 참조
 - 학습 자료는 [Tutorial](../workflow/tutorial/) 참조
-- 전체 방법론은 [PROJECT_MANAGEMENT_GUIDE.md](../.workflow/docs/PROJECT_MANAGEMENT_GUIDE.md) 참조
