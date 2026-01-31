@@ -1052,11 +1052,13 @@ flow check 2 --skip-action
 | 건너뛰기 쉬움         | 강제 실행                    |
 | 수동 감사             | 자동 감사 추적               |
 
-### Claude Code Hook 통합
+### AI CLI Hook 통합 (Claude Code / Gemini CLI)
 
-Claude Code의 PostToolUse 훅을 사용하여 에이전트 리뷰 등록을 자동화합니다. AI 에이전트(`Task` 도구를 통해)가 리뷰를 완료하면 훅이 자동으로 워크플로우 시스템에 등록합니다.
+CLI 훅을 사용하여 에이전트 리뷰 등록을 자동화합니다. AI 에이전트가 리뷰를 완료하면 훅이 자동으로 워크플로우 시스템에 등록합니다.
 
-#### 설정
+**Claude Code**와 **Gemini CLI** 모두 유사한 설정 패턴으로 훅을 지원합니다.
+
+#### Claude Code 설정
 
 1. **훅 스크립트 복사:**
 
@@ -1066,7 +1068,7 @@ cp examples/hooks/auto-review.sh .claude/hooks/
 chmod +x .claude/hooks/auto-review.sh
 ```
 
-2. **Claude Code 설정** (`.claude/settings.json`):
+2. **`.claude/settings.json` 설정:**
 
 ```json
 {
@@ -1086,28 +1088,67 @@ chmod +x .claude/hooks/auto-review.sh
 }
 ```
 
+#### Gemini CLI 설정
+
+1. **훅 스크립트 복사:**
+
+```bash
+mkdir -p .gemini/hooks
+cp examples/hooks/auto-review.sh .gemini/hooks/
+chmod +x .gemini/hooks/auto-review.sh
+```
+
+2. **`settings.json` 설정:**
+
+```json
+{
+  "hooks": {
+    "AfterTool": [
+      {
+        "matcher": "spawn_agent|delegate",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$GEMINI_PROJECT_DIR/.gemini/hooks/auto-review.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+#### Hook 이벤트 비교
+
+| 항목 | Claude Code | Gemini CLI |
+|------|-------------|------------|
+| 이벤트명 | `PostToolUse` | `AfterTool` |
+| 설정 파일 | `.claude/settings.json` | `settings.json` |
+| 경로 변수 | (상대 경로) | `$GEMINI_PROJECT_DIR` |
+| 상태 | 안정 | 실험적 |
+
 #### 작동 원리
 
 ```
 ┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│  Claude Code    │────►│  PostToolUse     │────►│  flow review    │
-│  Task 도구      │     │  Hook 트리거     │     │  --agent X      │
-│  (에이전트 호출)│     │  auto-review.sh  │     │  자동 등록      │
+│  AI CLI         │────►│  Hook 이벤트     │────►│  flow review    │
+│  Task/Agent     │     │  (PostToolUse/   │     │  --agent X      │
+│  도구 호출      │     │   AfterTool)     │     │  자동 등록      │
 └─────────────────┘     └──────────────────┘     └─────────────────┘
 ```
 
-1. AI가 `subagent_type: "code-reviewer"`로 `Task` 도구 호출
-2. Claude Code의 PostToolUse 훅이 완료를 감지
+1. AI가 에이전트 위임 도구 호출
+2. CLI의 사후 실행 훅이 완료를 감지
 3. 훅 스크립트가 에이전트 이름을 추출하고 `flow review` 호출
 4. 에이전트 리뷰가 감사 로그에 등록됨
-5. `[AGENT:code-reviewer]` 항목의 `flow check`가 이제 통과됨
+5. `[AGENT:name]` 항목의 `flow check`가 이제 통과됨
 
 #### 수동 대안
 
 훅이 설정되지 않은 경우 `--agent` 플래그 사용:
 
 ```bash
-# delegate_to_agent 완료 후
+# 에이전트 위임 완료 후
 flow check 1 --agent code-reviewer
 ```
 

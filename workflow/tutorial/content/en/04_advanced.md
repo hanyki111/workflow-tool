@@ -103,39 +103,48 @@ flow check 1
 flow check 1 --agent plan-critic
 ```
 
-### Claude Code Hook Integration (Automation)
+### AI CLI Hook Integration (Automation)
 
-Fully automate agent review registration using Claude Code hooks.
+Fully automate agent review registration using CLI hooks.
+Both **Claude Code** and **Gemini CLI** are supported.
 
-**1. Setup hook script:**
+**Claude Code setup:**
 ```bash
 mkdir -p .claude/hooks
 cp examples/hooks/auto-review.sh .claude/hooks/
 chmod +x .claude/hooks/auto-review.sh
 ```
 
-**2. Configure `.claude/settings.json`:**
+`.claude/settings.json`:
 ```json
 {
   "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Task",
-        "hooks": [{
-          "type": "command",
-          "command": ".claude/hooks/auto-review.sh"
-        }]
-      }
-    ]
+    "PostToolUse": [{ "matcher": "Task", "hooks": [{ "type": "command", "command": ".claude/hooks/auto-review.sh" }] }]
+  }
+}
+```
+
+**Gemini CLI setup:**
+```bash
+mkdir -p .gemini/hooks
+cp examples/hooks/auto-review.sh .gemini/hooks/
+chmod +x .gemini/hooks/auto-review.sh
+```
+
+`settings.json`:
+```json
+{
+  "hooks": {
+    "AfterTool": [{ "matcher": "spawn_agent|delegate", "hooks": [{ "type": "command", "command": "$GEMINI_PROJECT_DIR/.gemini/hooks/auto-review.sh" }] }]
   }
 }
 ```
 
 **How it works:**
-1. AI calls Task tool with `subagent_type: "code-reviewer"`
-2. PostToolUse hook intercepts completion
+1. AI calls agent delegation tool
+2. Hook intercepts completion (PostToolUse/AfterTool)
 3. Hook extracts agent name, calls `flow review`
-4. `[AGENT:code-reviewer]` items now pass `flow check`
+4. `[AGENT:name]` items now pass `flow check`
 
 ## Variables
 

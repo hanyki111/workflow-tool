@@ -897,11 +897,13 @@ flow check 2 --skip-action
 | Easy to skip          | Enforced execution             |
 | Manual audit          | Automatic audit trail          |
 
-### Claude Code Hook Integration
+### AI CLI Hook Integration (Claude Code / Gemini CLI)
 
-Automate agent review registration using Claude Code's PostToolUse hooks. When an AI agent (via `Task` tool) completes a review, the hook automatically registers it with the workflow system.
+Automate agent review registration using CLI hooks. When an AI agent completes a review, the hook automatically registers it with the workflow system.
 
-#### Setup
+Both **Claude Code** and **Gemini CLI** support hooks with similar configuration patterns.
+
+#### Claude Code Setup
 
 1. **Copy the hook script:**
 
@@ -911,7 +913,7 @@ cp examples/hooks/auto-review.sh .claude/hooks/
 chmod +x .claude/hooks/auto-review.sh
 ```
 
-2. **Configure Claude Code settings** (`.claude/settings.json`):
+2. **Configure** `.claude/settings.json`:
 
 ```json
 {
@@ -931,28 +933,67 @@ chmod +x .claude/hooks/auto-review.sh
 }
 ```
 
+#### Gemini CLI Setup
+
+1. **Copy the hook script:**
+
+```bash
+mkdir -p .gemini/hooks
+cp examples/hooks/auto-review.sh .gemini/hooks/
+chmod +x .gemini/hooks/auto-review.sh
+```
+
+2. **Configure** `settings.json`:
+
+```json
+{
+  "hooks": {
+    "AfterTool": [
+      {
+        "matcher": "spawn_agent|delegate",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$GEMINI_PROJECT_DIR/.gemini/hooks/auto-review.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+#### Hook Event Comparison
+
+| Feature | Claude Code | Gemini CLI |
+|---------|-------------|------------|
+| Event name | `PostToolUse` | `AfterTool` |
+| Config file | `.claude/settings.json` | `settings.json` |
+| Path variable | (relative path) | `$GEMINI_PROJECT_DIR` |
+| Status | Stable | Experimental |
+
 #### How It Works
 
 ```
 ┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│  Claude Code    │────►│  PostToolUse     │────►│  flow review    │
-│  Task tool      │     │  Hook triggers   │     │  --agent X      │
-│  (agent call)   │     │  auto-review.sh  │     │  auto-registered│
+│  AI CLI         │────►│  Hook Event      │────►│  flow review    │
+│  Task/Agent     │     │  (PostToolUse/   │     │  --agent X      │
+│  tool call      │     │   AfterTool)     │     │  auto-registered│
 └─────────────────┘     └──────────────────┘     └─────────────────┘
 ```
 
-1. AI calls `Task` tool with `subagent_type: "code-reviewer"`
-2. Claude Code's PostToolUse hook intercepts the completion
+1. AI calls agent delegation tool
+2. CLI's post-execution hook intercepts the completion
 3. Hook script extracts agent name and calls `flow review`
 4. Agent review is registered in audit log
-5. `flow check` for `[AGENT:code-reviewer]` items now passes
+5. `flow check` for `[AGENT:name]` items now passes
 
 #### Manual Alternative
 
 If hooks aren't configured, use the `--agent` flag:
 
 ```bash
-# After delegate_to_agent completes
+# After agent delegation completes
 flow check 1 --agent code-reviewer
 ```
 

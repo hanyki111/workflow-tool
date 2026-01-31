@@ -103,39 +103,48 @@ flow check 1
 flow check 1 --agent plan-critic
 ```
 
-### Claude Code Hook 통합 (자동화)
+### AI CLI Hook 통합 (자동화)
 
-Claude Code 훅을 사용하여 에이전트 리뷰 등록을 완전 자동화합니다.
+CLI 훅을 사용하여 에이전트 리뷰 등록을 완전 자동화합니다.
+**Claude Code**와 **Gemini CLI** 모두 지원됩니다.
 
-**1. 훅 스크립트 설정:**
+**Claude Code 설정:**
 ```bash
 mkdir -p .claude/hooks
 cp examples/hooks/auto-review.sh .claude/hooks/
 chmod +x .claude/hooks/auto-review.sh
 ```
 
-**2. `.claude/settings.json` 설정:**
+`.claude/settings.json`:
 ```json
 {
   "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Task",
-        "hooks": [{
-          "type": "command",
-          "command": ".claude/hooks/auto-review.sh"
-        }]
-      }
-    ]
+    "PostToolUse": [{ "matcher": "Task", "hooks": [{ "type": "command", "command": ".claude/hooks/auto-review.sh" }] }]
+  }
+}
+```
+
+**Gemini CLI 설정:**
+```bash
+mkdir -p .gemini/hooks
+cp examples/hooks/auto-review.sh .gemini/hooks/
+chmod +x .gemini/hooks/auto-review.sh
+```
+
+`settings.json`:
+```json
+{
+  "hooks": {
+    "AfterTool": [{ "matcher": "spawn_agent|delegate", "hooks": [{ "type": "command", "command": "$GEMINI_PROJECT_DIR/.gemini/hooks/auto-review.sh" }] }]
   }
 }
 ```
 
 **작동 원리:**
-1. AI가 `subagent_type: "code-reviewer"`로 Task 도구 호출
-2. PostToolUse 훅이 완료를 감지
+1. AI가 에이전트 위임 도구 호출
+2. 훅이 완료를 감지 (PostToolUse/AfterTool)
 3. 훅이 에이전트 이름을 추출하고 `flow review` 호출
-4. `[AGENT:code-reviewer]` 항목의 `flow check`가 이제 통과됨
+4. `[AGENT:name]` 항목의 `flow check`가 이제 통과됨
 
 ## 변수
 
