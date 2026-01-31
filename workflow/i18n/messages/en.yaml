@@ -27,6 +27,7 @@ help:
     evidence: "Add audit evidence or justification"
     args: "Arguments for action command (e.g., commit message)"
     skip_action: "Skip action execution (manual override)"
+    agent: "Pre-register agent review before check (e.g., --agent plan-critic)"
 
   set:
     description: "Manually set current stage/module"

@@ -113,8 +113,13 @@ class WorkflowController:
 
         return "\n".join(output)
 
-    def check(self, indices: List[int], token: Optional[str] = None, evidence: Optional[str] = None, args: Optional[str] = None, skip_action: bool = False) -> str:
+    def check(self, indices: List[int], token: Optional[str] = None, evidence: Optional[str] = None, args: Optional[str] = None, skip_action: bool = False, agent: Optional[str] = None) -> str:
         results = []
+
+        # Pre-register agent review if --agent flag provided
+        if agent:
+            self.record_review(agent, f"Registered via check --agent")
+            results.append(f"ℹ️  Agent review from '{agent}' registered.")
 
         # Get stage config for action definitions
         stage_config = self.config.stages.get(self.state.current_stage)

@@ -91,6 +91,10 @@ def main():
         action="store_true",
         help=t('help.check.skip_action')
     )
+    check_parser.add_argument(
+        "--agent",
+        help=t('help.check.agent')
+    )
 
     # Set
     set_parser = subparsers.add_parser(
@@ -244,7 +248,7 @@ def main():
         elif args.command == "next":
             print(ctrl.next_stage(args.target, force=args.force, reason=args.reason, token=args.token))
         elif args.command == "check":
-            print(ctrl.check(args.indices, token=args.token, evidence=args.evidence, args=args.args, skip_action=args.skip_action))
+            print(ctrl.check(args.indices, token=args.token, evidence=args.evidence, args=args.args, skip_action=args.skip_action, agent=getattr(args, 'agent', None)))
         elif args.command == "set":
             print(ctrl.set_stage(args.stage, module=args.module, force=args.force, token=args.token))
         elif args.command == "review":

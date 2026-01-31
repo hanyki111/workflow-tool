@@ -27,6 +27,7 @@ help:
     evidence: "감사 증거 또는 근거 추가"
     args: "액션 명령어용 인자 (예: 커밋 메시지)"
     skip_action: "액션 실행 건너뛰기 (수동 오버라이드)"
+    agent: "체크 전 에이전트 리뷰 사전 등록 (예: --agent plan-critic)"
 
   set:
     description: "현재 스테이지/모듈 수동 설정"
