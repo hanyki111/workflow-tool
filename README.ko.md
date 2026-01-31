@@ -1300,6 +1300,50 @@ stages:
 
 `when` 조건이 false로 평가되면, 해당 규칙은 감사 로그에 `SKIPPED`로 기록됩니다.
 
+### 쉘 래퍼를 통한 자동화
+
+태그와 쉘 래퍼를 사용하여 CLI 명령 성공 시 체크리스트를 자동 업데이트합니다.
+
+**1단계: 체크리스트 항목에 태그 추가**
+```yaml
+stages:
+  DEVELOP:
+    checklist:
+      - "[CMD:pytest] 테스트 실행"
+      - "[CMD:memory-write] 문서 저장"
+      - "[CMD:lint] 린터 실행"
+```
+
+**2단계: 쉘 래퍼 생성** (`.bashrc` 또는 프로젝트 `.envrc`에)
+```bash
+# pytest 래퍼
+pytest() {
+    command pytest "$@"
+    [ $? -eq 0 ] && flow check --tag "CMD:pytest" 2>/dev/null
+}
+
+# 서브커맨드 인식 래퍼
+memory_tool() {
+    command memory_tool "$@"
+    [ $? -eq 0 ] && case "$1" in
+        write|save) flow check --tag "CMD:memory-write" ;;
+    esac
+}
+```
+
+**3단계: 평소처럼 사용** - 성공 시 체크리스트 자동 업데이트
+```bash
+pytest tests/        # ✅ 자동 체크: "[CMD:pytest] 테스트 실행"
+memory_tool write x  # ✅ 자동 체크: "[CMD:memory-write] 문서 저장"
+memory_tool read x   # (체크 안 됨 - read는 매핑되지 않음)
+```
+
+**장점:**
+- AI와 사용자 실행 모두 동작
+- 서브커맨드 인식 (특정 액션만 체크 트리거)
+- 항목 인덱스 번호를 알 필요 없음
+- 명시적 태그로 실수 방지
+
 ---
 
 ## 다국어 지원

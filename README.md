@@ -1145,6 +1145,50 @@ stages:
 
 When a `when` condition evaluates to false, the rule is marked as `SKIPPED` in the audit log.
 
+### Shell Wrapper Automation
+
+Automatically check items when CLI commands succeed using tags and shell wrappers.
+
+**Step 1: Add tags to checklist items**
+```yaml
+stages:
+  DEVELOP:
+    checklist:
+      - "[CMD:pytest] Run tests"
+      - "[CMD:memory-write] Save documentation"
+      - "[CMD:lint] Run linter"
+```
+
+**Step 2: Create shell wrappers** (in `.bashrc` or project `.envrc`)
+```bash
+# pytest wrapper
+pytest() {
+    command pytest "$@"
+    [ $? -eq 0 ] && flow check --tag "CMD:pytest" 2>/dev/null
+}
+
+# Subcommand-aware wrapper
+memory_tool() {
+    command memory_tool "$@"
+    [ $? -eq 0 ] && case "$1" in
+        write|save) flow check --tag "CMD:memory-write" ;;
+    esac
+}
+```
+
+**Step 3: Use normally** - checklist auto-updates on success
+```bash
+pytest tests/        # ✅ Auto-checks "[CMD:pytest] Run tests"
+memory_tool write x  # ✅ Auto-checks "[CMD:memory-write] Save documentation"
+memory_tool read x   # (no check - read is not mapped)
+```
+
+**Benefits:**
+- Works for both AI and human-executed commands
+- Subcommand-aware (only specific actions trigger checks)
+- No need to know item index numbers
+- Explicit tags prevent accidental matches
+
 ### Stage Entry Hooks
 
 Execute actions when entering a stage:
