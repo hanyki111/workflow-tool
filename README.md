@@ -1177,6 +1177,37 @@ Automatically load workflow status when AI starts a session. Both Claude Code an
 
 **Result:** AI automatically knows the current workflow state at session start.
 
+### User Prompt Hook (Real-time Status)
+
+Show workflow status every time user submits a prompt.
+
+**Claude Code** - `UserPromptSubmit`:
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      { "hooks": [{ "type": "command", "command": "flow status --oneline 2>/dev/null || true" }] }
+    ]
+  }
+}
+```
+
+**Gemini CLI** - `BeforeModel`:
+```json
+{
+  "hooks": {
+    "BeforeModel": [
+      { "hooks": [{ "type": "command", "command": "flow status --oneline 2>/dev/null || true" }] }
+    ]
+  }
+}
+```
+
+| Hook | Trigger | Use Case |
+|------|---------|----------|
+| `SessionStart` | Once at session start | Initial context |
+| `UserPromptSubmit` / `BeforeModel` | Every prompt | Real-time tracking |
+
 ### Shell Wrapper Automation
 
 Automatically check items when CLI commands succeed using tags and shell wrappers.

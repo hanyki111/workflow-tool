@@ -196,6 +196,59 @@ Automatically show workflow status when AI starts a session.
 
 **Result:** When AI starts, it automatically sees the current workflow state in its context.
 
+### User Prompt Hook (Real-time Status on Every Input)
+
+Show workflow status every time user submits a prompt (not just session start).
+
+**Claude Code** - `UserPromptSubmit` (`.claude/settings.json`):
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [{ "type": "command", "command": "flow status --oneline 2>/dev/null || true" }]
+      }
+    ]
+  }
+}
+```
+
+**Gemini CLI** - `BeforeModel` (`settings.json`):
+```json
+{
+  "hooks": {
+    "BeforeModel": [
+      {
+        "hooks": [{ "type": "command", "command": "flow status --oneline 2>/dev/null || true" }]
+      }
+    ]
+  }
+}
+```
+
+**Comparison:**
+| Hook | Trigger | Use Case |
+|------|---------|----------|
+| `SessionStart` | Once at session start/resume | Initial context loading |
+| `UserPromptSubmit` / `BeforeModel` | Every user prompt | Real-time status tracking |
+
+**Recommended combined setup:**
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      { "matcher": "startup", "hooks": [{ "type": "command", "command": "flow status 2>/dev/null || true" }] }
+    ],
+    "UserPromptSubmit": [
+      { "hooks": [{ "type": "command", "command": "flow status --oneline 2>/dev/null || true" }] }
+    ]
+  }
+}
+```
+
+- Session start: Full status display
+- Each prompt: One-line status (minimal overhead)
+
 ## Automated Checking with Shell Wrappers
 
 Automate checklist updates when specific CLI commands succeed using tags and shell wrappers.

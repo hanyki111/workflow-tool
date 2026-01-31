@@ -1332,6 +1332,37 @@ AI가 세션을 시작할 때 워크플로우 상태를 자동으로 로드합�
 
 **결과:** AI가 세션 시작 시 자동으로 현재 워크플로우 상태를 파악합니다.
 
+### 사용자 프롬프트 훅 (실시간 상태)
+
+사용자가 프롬프트를 제출할 때마다 워크플로우 상태를 표시합니다.
+
+**Claude Code** - `UserPromptSubmit`:
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      { "hooks": [{ "type": "command", "command": "flow status --oneline 2>/dev/null || true" }] }
+    ]
+  }
+}
+```
+
+**Gemini CLI** - `BeforeModel`:
+```json
+{
+  "hooks": {
+    "BeforeModel": [
+      { "hooks": [{ "type": "command", "command": "flow status --oneline 2>/dev/null || true" }] }
+    ]
+  }
+}
+```
+
+| 훅 | 트리거 시점 | 용도 |
+|----|-----------|------|
+| `SessionStart` | 세션 시작 시 1회 | 초기 컨텍스트 |
+| `UserPromptSubmit` / `BeforeModel` | 프롬프트마다 | 실시간 추적 |
+
 ### 쉘 래퍼를 통한 자동화
 
 태그와 쉘 래퍼를 사용하여 CLI 명령 성공 시 체크리스트를 자동 업데이트합니다.
