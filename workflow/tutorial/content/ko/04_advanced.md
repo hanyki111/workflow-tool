@@ -90,6 +90,53 @@ flow review --agent "code-reviewer" --summary "모든 SOLID 원칙 준수, 이�
 
 나중에 확인할 수 있는 감사 기록이 생성됩니다.
 
+### --agent 플래그로 간소화된 체크
+
+`[AGENT:name]` 항목을 인라인 등록과 함께 체크:
+
+```bash
+# 두 명령어 대신:
+flow review --agent plan-critic --summary "..."
+flow check 1
+
+# 하나의 명령어로:
+flow check 1 --agent plan-critic
+```
+
+### Claude Code Hook 통합 (자동화)
+
+Claude Code 훅을 사용하여 에이전트 리뷰 등록을 완전 자동화합니다.
+
+**1. 훅 스크립트 설정:**
+```bash
+mkdir -p .claude/hooks
+cp examples/hooks/auto-review.sh .claude/hooks/
+chmod +x .claude/hooks/auto-review.sh
+```
+
+**2. `.claude/settings.json` 설정:**
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Task",
+        "hooks": [{
+          "type": "command",
+          "command": ".claude/hooks/auto-review.sh"
+        }]
+      }
+    ]
+  }
+}
+```
+
+**작동 원리:**
+1. AI가 `subagent_type: "code-reviewer"`로 Task 도구 호출
+2. PostToolUse 훅이 완료를 감지
+3. 훅이 에이전트 이름을 추출하고 `flow review` 호출
+4. `[AGENT:code-reviewer]` 항목의 `flow check`가 이제 통과됨
+
 ## 변수
 
 프로젝트 전체 변수 정의:

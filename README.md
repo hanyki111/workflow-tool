@@ -500,6 +500,21 @@ flow review --agent "code-reviewer" --summary "All SOLID principles followed, no
 # This creates an audit log entry that can be verified later
 ```
 
+### `flow check --agent` (Streamlined Agent Review)
+
+When checking an `[AGENT:name]` item, you can register the agent review inline:
+
+```bash
+# Instead of two commands:
+flow review --agent plan-critic --summary "..."
+flow check 1
+
+# Use one command:
+flow check 1 --agent plan-critic
+```
+
+This automatically registers the agent review before checking the item.
+
 ### `flow secret-generate`
 
 Create a secret for USER-APPROVE items.
@@ -881,6 +896,65 @@ flow check 2 --skip-action
 | No verification       | Command must succeed (exit 0)  |
 | Easy to skip          | Enforced execution             |
 | Manual audit          | Automatic audit trail          |
+
+### Claude Code Hook Integration
+
+Automate agent review registration using Claude Code's PostToolUse hooks. When an AI agent (via `Task` tool) completes a review, the hook automatically registers it with the workflow system.
+
+#### Setup
+
+1. **Copy the hook script:**
+
+```bash
+mkdir -p .claude/hooks
+cp examples/hooks/auto-review.sh .claude/hooks/
+chmod +x .claude/hooks/auto-review.sh
+```
+
+2. **Configure Claude Code settings** (`.claude/settings.json`):
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/auto-review.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+#### How It Works
+
+```
+┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│  Claude Code    │────►│  PostToolUse     │────►│  flow review    │
+│  Task tool      │     │  Hook triggers   │     │  --agent X      │
+│  (agent call)   │     │  auto-review.sh  │     │  auto-registered│
+└─────────────────┘     └──────────────────┘     └─────────────────┘
+```
+
+1. AI calls `Task` tool with `subagent_type: "code-reviewer"`
+2. Claude Code's PostToolUse hook intercepts the completion
+3. Hook script extracts agent name and calls `flow review`
+4. Agent review is registered in audit log
+5. `flow check` for `[AGENT:code-reviewer]` items now passes
+
+#### Manual Alternative
+
+If hooks aren't configured, use the `--agent` flag:
+
+```bash
+# After delegate_to_agent completes
+flow check 1 --agent code-reviewer
+```
 
 ### Creating Custom Plugins
 
