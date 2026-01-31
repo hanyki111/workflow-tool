@@ -1145,6 +1145,38 @@ stages:
 
 When a `when` condition evaluates to false, the rule is marked as `SKIPPED` in the audit log.
 
+### AI Session Start Hook
+
+Automatically load workflow status when AI starts a session. Both Claude Code and Gemini CLI support `SessionStart` hooks.
+
+**Claude Code** (`.claude/settings.json`):
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      { "matcher": "startup", "hooks": [{ "type": "command", "command": "flow status 2>/dev/null || true" }] },
+      { "matcher": "resume", "hooks": [{ "type": "command", "command": "flow status --oneline 2>/dev/null || true" }] }
+    ]
+  }
+}
+```
+
+**Gemini CLI** (`settings.json`):
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      { "matcher": "startup", "hooks": [{ "type": "command", "command": "flow status 2>/dev/null || true" }] },
+      { "matcher": "resume", "hooks": [{ "type": "command", "command": "flow status --oneline 2>/dev/null || true" }] }
+    ]
+  }
+}
+```
+
+**Matchers:** `startup` (new session), `resume` (continue session), `clear` (after /clear)
+
+**Result:** AI automatically knows the current workflow state at session start.
+
 ### Shell Wrapper Automation
 
 Automatically check items when CLI commands succeed using tags and shell wrappers.

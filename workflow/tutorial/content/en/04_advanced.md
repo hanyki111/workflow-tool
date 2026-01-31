@@ -146,6 +146,56 @@ chmod +x .gemini/hooks/auto-review.sh
 3. Hook extracts agent name, calls `flow review`
 4. `[AGENT:name]` items now pass `flow check`
 
+### Session Start Hook (Auto-load Workflow Status)
+
+Automatically show workflow status when AI starts a session.
+
+**Claude Code** (`.claude/settings.json`):
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [{ "type": "command", "command": "flow status 2>/dev/null || echo 'No workflow initialized'" }]
+      },
+      {
+        "matcher": "resume",
+        "hooks": [{ "type": "command", "command": "flow status --oneline 2>/dev/null || true" }]
+      }
+    ]
+  }
+}
+```
+
+**Gemini CLI** (`settings.json`):
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [{ "type": "command", "command": "flow status 2>/dev/null || echo 'No workflow initialized'" }]
+      },
+      {
+        "matcher": "resume",
+        "hooks": [{ "type": "command", "command": "flow status --oneline 2>/dev/null || true" }]
+      }
+    ]
+  }
+}
+```
+
+**Matchers:**
+| Matcher | Trigger |
+|---------|---------|
+| `startup` | New session |
+| `resume` | Resume existing session |
+| `clear` | After `/clear` command |
+| `compact` | After context compaction (Claude Code only) |
+
+**Result:** When AI starts, it automatically sees the current workflow state in its context.
+
 ## Automated Checking with Shell Wrappers
 
 Automate checklist updates when specific CLI commands succeed using tags and shell wrappers.

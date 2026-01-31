@@ -1300,6 +1300,38 @@ stages:
 
 `when` 조건이 false로 평가되면, 해당 규칙은 감사 로그에 `SKIPPED`로 기록됩니다.
 
+### AI 세션 시작 훅
+
+AI가 세션을 시작할 때 워크플로우 상태를 자동으로 로드합니다. Claude Code와 Gemini CLI 모두 `SessionStart` 훅을 지원합니다.
+
+**Claude Code** (`.claude/settings.json`):
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      { "matcher": "startup", "hooks": [{ "type": "command", "command": "flow status 2>/dev/null || true" }] },
+      { "matcher": "resume", "hooks": [{ "type": "command", "command": "flow status --oneline 2>/dev/null || true" }] }
+    ]
+  }
+}
+```
+
+**Gemini CLI** (`settings.json`):
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      { "matcher": "startup", "hooks": [{ "type": "command", "command": "flow status 2>/dev/null || true" }] },
+      { "matcher": "resume", "hooks": [{ "type": "command", "command": "flow status --oneline 2>/dev/null || true" }] }
+    ]
+  }
+}
+```
+
+**매처:** `startup` (새 세션), `resume` (세션 재개), `clear` (/clear 후)
+
+**결과:** AI가 세션 시작 시 자동으로 현재 워크플로우 상태를 파악합니다.
+
 ### 쉘 래퍼를 통한 자동화
 
 태그와 쉘 래퍼를 사용하여 CLI 명령 성공 시 체크리스트를 자동 업데이트합니다.

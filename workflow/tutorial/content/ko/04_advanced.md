@@ -146,6 +146,56 @@ chmod +x .gemini/hooks/auto-review.sh
 3. 훅이 에이전트 이름을 추출하고 `flow review` 호출
 4. `[AGENT:name]` 항목의 `flow check`가 이제 통과됨
 
+### 세션 시작 훅 (워크플로우 상태 자동 로드)
+
+AI가 세션을 시작할 때 워크플로우 상태를 자동으로 표시합니다.
+
+**Claude Code** (`.claude/settings.json`):
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [{ "type": "command", "command": "flow status 2>/dev/null || echo 'No workflow initialized'" }]
+      },
+      {
+        "matcher": "resume",
+        "hooks": [{ "type": "command", "command": "flow status --oneline 2>/dev/null || true" }]
+      }
+    ]
+  }
+}
+```
+
+**Gemini CLI** (`settings.json`):
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [{ "type": "command", "command": "flow status 2>/dev/null || echo 'No workflow initialized'" }]
+      },
+      {
+        "matcher": "resume",
+        "hooks": [{ "type": "command", "command": "flow status --oneline 2>/dev/null || true" }]
+      }
+    ]
+  }
+}
+```
+
+**매처:**
+| Matcher | 트리거 시점 |
+|---------|------------|
+| `startup` | 새 세션 시작 |
+| `resume` | 기존 세션 재개 |
+| `clear` | `/clear` 명령 후 |
+| `compact` | 컨텍스트 압축 후 (Claude Code만) |
+
+**결과:** AI가 시작하면 자동으로 현재 워크플로우 상태를 컨텍스트에서 확인합니다.
+
 ## 쉘 래퍼를 통한 자동 체크
 
 태그와 쉘 래퍼를 사용하여 특정 CLI 명령 성공 시 체크리스트를 자동 업데이트합니다.
