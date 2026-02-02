@@ -11,6 +11,9 @@ from .i18n import t
 # Template: Simple workflow
 SIMPLE_WORKFLOW = '''version: "2.0"
 
+# Language setting: "en" (English), "ko" (Korean), or "" (auto-detect)
+language: ""
+
 variables:
   project_name: "{project_name}"
 
@@ -74,6 +77,9 @@ stages:
 
 # Template: Full M0-M4, P1-P7 workflow
 FULL_WORKFLOW = '''version: "2.0"
+
+# Language setting: "en" (English), "ko" (Korean), or "" (auto-detect)
+language: ""
 
 variables:
   project_name: "{project_name}"
@@ -566,12 +572,12 @@ def init_project(
     # 1. Create workflow.yaml
     workflow_path = cwd / "workflow.yaml"
     if workflow_path.exists() and not force:
-        results.append(f"⚠️  workflow.yaml already exists (use --force to overwrite)")
+        results.append(t('init.workflow_exists'))
     else:
         workflow_content = SIMPLE_WORKFLOW if template == "simple" else FULL_WORKFLOW
         workflow_content = workflow_content.format(project_name=project_name)
         workflow_path.write_text(workflow_content, encoding='utf-8')
-        results.append(f"✅ Created workflow.yaml ({template} template)")
+        results.append(t('init.workflow_created', template=template))
 
     # 2. Create .workflow/state.json
     workflow_dir = cwd / ".workflow"
@@ -589,16 +595,16 @@ def init_project(
                 # Use first stage from existing workflow.yaml
                 first_stage = list(existing_config['stages'].keys())[0]
                 initial_stage = first_stage
-                results.append(f"ℹ️  Using first stage from workflow.yaml: {first_stage}")
+                results.append(t('init.using_first_stage', stage=first_stage))
         except Exception:
             pass  # Fall back to template default
 
     if state_path.exists() and not force:
-        results.append(f"⚠️  .workflow/state.json already exists")
+        results.append(t('init.state_exists'))
     else:
         state_content = INITIAL_STATE.format(initial_stage=initial_stage)
         state_path.write_text(state_content, encoding='utf-8')
-        results.append(f"✅ Created .workflow/state.json (stage: {initial_stage})")
+        results.append(t('init.state_created', stage=initial_stage))
 
     # 3. Create .workflow/docs/PROJECT_MANAGEMENT_GUIDE.md
     if with_guide:
@@ -607,30 +613,30 @@ def init_project(
         guide_path = docs_dir / "PROJECT_MANAGEMENT_GUIDE.md"
 
         if guide_path.exists() and not force:
-            results.append(f"⚠️  PROJECT_MANAGEMENT_GUIDE.md already exists")
+            results.append(t('init.guide_exists'))
         else:
             stage_docs = generate_stage_docs(template)
             guide_content = GUIDE_TEMPLATE.format(stage_docs=stage_docs)
             guide_path.write_text(guide_content, encoding='utf-8')
-            results.append(f"✅ Created .workflow/docs/PROJECT_MANAGEMENT_GUIDE.md")
+            results.append(t('init.guide_created'))
 
     # 4. Create workflow instructions template
     if with_claude_md:
         template_path = workflow_dir / "WORKFLOW_INSTRUCTIONS.md"
         template_path.write_text(WORKFLOW_INSTRUCTIONS_TEMPLATE, encoding='utf-8')
-        results.append(f"✅ Created .workflow/WORKFLOW_INSTRUCTIONS.md")
+        results.append(t('init.instructions_created'))
 
         claude_path = cwd / "CLAUDE.md"
         if claude_path.exists():
             # CLAUDE.md exists - provide guidance on what to add
             results.append("")
-            results.append("📋 CLAUDE.md already exists. Add these lines:")
+            results.append(t('init.claude_md_guidance'))
             results.append("-" * 50)
-            results.append("1. At the TOP of CLAUDE.md, add:")
-            results.append("   @import .workflow/ACTIVE_STATUS.md")
+            results.append(t('init.claude_md_top'))
+            results.append(t('init.claude_md_import'))
             results.append("")
-            results.append("2. Add the workflow section from:")
-            results.append("   .workflow/WORKFLOW_INSTRUCTIONS.md")
+            results.append(t('init.claude_md_section'))
+            results.append(t('init.claude_md_source'))
             results.append("-" * 50)
         else:
             # No CLAUDE.md - create a minimal one
@@ -674,7 +680,7 @@ def init_project(
 Project: {project_name}
 '''
             claude_path.write_text(minimal_claude.format(project_name=project_name), encoding='utf-8')
-            results.append(f"✅ Created CLAUDE.md (minimal template)")
+            results.append(t('init.claude_md_created'))
 
     # 5. Create .gitignore entries suggestion
     gitignore_path = cwd / ".gitignore"
@@ -687,23 +693,23 @@ Project: {project_name}
     if gitignore_path.exists():
         content = gitignore_path.read_text()
         if ".workflow/secret" not in content:
-            results.append(f"💡 Consider adding to .gitignore:\n{gitignore_entries}")
+            results.append(t('init.gitignore_suggestion') + gitignore_entries)
     else:
-        results.append(f"💡 Create .gitignore with:\n{gitignore_entries}")
+        results.append(t('init.gitignore_create') + gitignore_entries)
 
     # Summary
     results.append("")
     results.append("=" * 50)
-    results.append(f"🎉 Project initialized with '{template}' workflow!")
+    results.append(t('init.success', template=template))
     results.append("")
-    results.append("Next steps:")
-    results.append("  1. Run: flow status")
-    results.append("  2. Run: flow secret-generate  (for USER-APPROVE)")
-    results.append("  3. Start working through the checklist")
+    results.append(t('init.next_steps'))
+    results.append(t('init.step_status'))
+    results.append(t('init.step_secret'))
+    results.append(t('init.step_work'))
     results.append("")
-    results.append("For AI assistants:")
-    results.append("  - CLAUDE.md contains workflow instructions")
-    results.append("  - AI should run 'flow status' at start of each session")
+    results.append(t('init.for_ai'))
+    results.append(t('init.ai_claude_md'))
+    results.append(t('init.ai_status'))
 
     return "\n".join(results)
 

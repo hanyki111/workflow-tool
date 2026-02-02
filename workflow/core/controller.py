@@ -12,6 +12,7 @@ from .validator import ValidatorRegistry
 from .context import WorkflowContext, WhenEvaluator
 from .audit import WorkflowAuditManager, AuditLogger
 from .auth import verify_token
+from workflow.i18n import t
 
 class WorkflowController:
     def __init__(self, config_path: str = "workflow.yaml"):
@@ -40,11 +41,11 @@ class WorkflowController:
 
     def status(self) -> str:
         if not self.state.current_stage:
-            return "Workflow not initialized. Use 'set' command."
+            return t('controller.status.not_initialized')
 
         stage = self.engine.current_stage
         if not stage:
-            return f"Error: Current stage '{self.state.current_stage}' not found in config."
+            return t('controller.status.stage_not_found', stage=self.state.current_stage)
 
         header_title = stage.label
 
@@ -83,8 +84,8 @@ class WorkflowController:
         self.state.save(self.config.state_file)
         
         # Build Output
-        output = [f"Current Stage: {self.state.current_stage} ({header_title})", "=" * 40]
-        output.append(f"Active Module: {self.context.data.get('active_module', 'None')}")
+        output = [t('controller.status.header', code=self.state.current_stage, label=header_title), "=" * 40]
+        output.append(t('controller.status.module', module=self.context.data.get('active_module', 'None')))
         output.append("-" * 40)
 
         for idx, item in enumerate(self.state.checklist):
@@ -98,15 +99,15 @@ class WorkflowController:
         total_count = len(self.state.checklist)
 
         output.append("-" * 40)
-        output.append(f"Progress: {checked_count}/{total_count} completed")
+        output.append(t('controller.status.progress', checked=checked_count, total=total_count))
 
         if unchecked_indices:
             indices_str = " ".join(map(str, unchecked_indices[:3]))
             if len(unchecked_indices) > 3:
                 indices_str += " ..."
-            output.append(f"→ Next: `flow check {indices_str}`")
+            output.append(t('controller.status.next_check', indices=indices_str))
         else:
-            output.append("→ All items done! Run: `flow next`")
+            output.append(t('controller.status.all_done'))
 
         # Update Hook File with hints
         self._update_active_status_file("\n".join(output), unchecked_indices)
@@ -119,14 +120,14 @@ class WorkflowController:
         # Pre-register agent review if --agent flag provided
         if agent:
             self.record_review(agent, f"Registered via check --agent")
-            results.append(f"ℹ️  Agent review from '{agent}' registered.")
+            results.append(t('controller.check.agent_registered', agent=agent))
 
         # Get stage config for action definitions
         stage_config = self.config.stages.get(self.state.current_stage)
 
         for index in indices:
             if index < 1 or index > len(self.state.checklist):
-                results.append(f"Invalid index: {index}")
+                results.append(t('controller.check.invalid_index', index=index))
                 continue
 
             item = self.state.checklist[index - 1]
@@ -145,48 +146,48 @@ class WorkflowController:
             # 1. Authorization Check (SHA-256)
             if item.text.strip().startswith("[USER-APPROVE]"):
                 if not token:
-                    results.append(f"❌ Error: Token required for [USER-APPROVE] item.")
+                    results.append(t('controller.check.token_required'))
                     continue
                 if not verify_token(token):
-                    results.append(f"❌ Error: Invalid token for: {item.text}")
+                    results.append(t('controller.check.invalid_token', text=item.text))
                     continue
 
             # 2. Agent Verification Check
             if required_agent:
                 if not self._verify_agent_review(required_agent):
-                    results.append(f"❌ Error: Agent review from '{required_agent}' not found in logs for current stage.")
+                    results.append(t('controller.check.agent_not_found', agent=required_agent))
                     continue
 
             # 3. Execute Action (if defined and not skipped)
             if item_config and item_config.action and not skip_action:
                 action_result = self._execute_action(item_config, args)
                 if not action_result['success']:
-                    results.append(f"❌ Action failed for item {index}: {action_result['error']}")
+                    results.append(t('controller.check.action_failed', index=index, error=action_result['error']))
                     # Show stdout if available (useful for test output, etc.)
                     if action_result.get('output'):
                         output_lines = action_result['output'].strip().split('\n')
                         # Show last 10 lines of output (most relevant for failures)
                         if len(output_lines) > 10:
-                            results.append(f"   Output (last 10 lines):")
+                            results.append(t('controller.check.action_output_header'))
                             for line in output_lines[-10:]:
-                                results.append(f"   | {line}")
+                                results.append(t('controller.check.action_output_line', line=line))
                         else:
-                            results.append(f"   Output:")
+                            results.append(t('controller.check.action_output_short'))
                             for line in output_lines:
-                                results.append(f"   | {line}")
-                    results.append(f"   → Use --skip-action to mark as done without running action")
+                                results.append(t('controller.check.action_output_line', line=line))
+                    results.append(t('controller.check.action_skip_hint'))
                     continue
-                results.append(f"✅ Action executed: {action_result['command']}")
+                results.append(t('controller.check.action_executed', command=action_result['command']))
                 if action_result.get('output'):
-                    results.append(f"   Output: {action_result['output'][:200]}")
+                    results.append(t('controller.check.action_output', output=action_result['output'][:200]))
             elif item_config and item_config.action and skip_action:
-                results.append(f"⚠️ Action skipped for item {index}: {item_config.action}")
+                results.append(t('controller.check.action_skipped', index=index, action=item_config.action))
 
             item.checked = True
             if evidence:
                 item.evidence = evidence
 
-            results.append(f"Checked: {item.text}")
+            results.append(t('controller.check.checked', text=item.text))
 
             # Log individual check with action info
             log_data = {
@@ -233,12 +234,12 @@ class WorkflowController:
                 matching_indices.append(i + 1)  # 1-based index
 
         if not matching_indices:
-            return f"ℹ️  No unchecked items found with tag: {tag}"
+            return t('controller.check.no_tag_match', tag=tag)
 
         if len(matching_indices) > 1:
             # Multiple matches - check all of them
             items_text = ", ".join([f"{i}" for i in matching_indices])
-            result = [f"ℹ️  Found {len(matching_indices)} items with tag {tag}: [{items_text}]"]
+            result = [t('controller.check.tag_found', count=len(matching_indices), tag=tag, items=items_text)]
         else:
             result = []
 
@@ -265,7 +266,7 @@ class WorkflowController:
         if item_config.require_args and not args:
             return {
                 'success': False,
-                'error': f"This action requires --args. Usage: flow check N --args \"your arguments\""
+                'error': t('controller.action.args_required')
             }
 
         # Substitute variables in action command using ContextResolver
@@ -322,7 +323,7 @@ class WorkflowController:
             return {
                 'success': False,
                 'command': command,
-                'error': "Action timed out after 5 minutes"
+                'error': t('controller.action.timeout')
             }
         except Exception as e:
             return {
@@ -340,29 +341,29 @@ class WorkflowController:
         if force:
             # Force requires USER-APPROVE token
             if not token:
-                return "❌ Error: --force requires USER-APPROVE token. Use: flow next --force --token YOUR_TOKEN --reason \"...\""
+                return t('controller.next.force_token_required')
             if not verify_token(token):
-                return "❌ Error: Invalid token for --force. USER-APPROVE required."
+                return t('controller.next.force_invalid_token')
             if not reason.strip():
-                return "❌ Error: A non-empty reason is mandatory for a forced transition."
+                return t('controller.next.force_reason_required')
 
         # 1. Validate Checklist (Human Requirement)
         unchecked = [i for i in self.state.checklist if not i.checked]
         if unchecked and not force:
-            return f"Cannot proceed. Unchecked items:\n" + "\n".join([f"- {i.text}" for i in unchecked])
+            return t('controller.next.unchecked_items') + "\n" + "\n".join([t('controller.next.unchecked_item', text=i.text) for i in unchecked])
 
         # 2. Determine Transition
         available = self.engine.get_available_transitions()
         if not available:
-            return "End of sequence. No next stage defined."
-            
+            return t('controller.next.end_of_sequence')
+
         if target:
             transition = self.engine.get_transition(target)
             if not transition:
-                return f"Invalid target '{target}'. Valid choices: {[t.target for t in available]}"
+                return t('controller.next.invalid_target', target=target, choices=[tr.target for tr in available])
         else:
             if len(available) > 1:
-                return f"Branching point. Please specify target. Choices: {[t.target for t in available]}"
+                return t('controller.next.branching_point', choices=[tr.target for tr in available])
             transition = available[0]
 
         # 3. Validate Conditions (System Requirement)
@@ -436,7 +437,7 @@ class WorkflowController:
             rule_results.append(res_entry)
 
         if errors and not force:
-            return "Cannot proceed. System validation failed:\n" + "\n".join([f"❌ {e}" for e in errors])
+            return t('controller.next.validation_failed') + "\n" + "\n".join([t('controller.next.validation_error', error=e) for e in errors])
 
         # 4. Success Transition
         from_stage = self.state.current_stage
@@ -456,37 +457,37 @@ class WorkflowController:
         )
         
         if force:
-            prefix = "⚠️ [FORCED] "
+            result_msg = t('controller.next.success_forced', stage=transition.target)
         elif skip_conditions:
-            prefix = "⚠️ [SKIP-CONDITIONS] "
+            result_msg = t('controller.next.success_skip_conditions', stage=transition.target)
         else:
-            prefix = "✅ "
-        return f"{prefix}Transitioned to {transition.target}\n" + self.status()
+            result_msg = "✅ " + t('controller.next.success', stage=transition.target)
+        return result_msg + "\n" + self.status()
 
     def set_stage(self, stage: str, module: Optional[str] = None, force: bool = False, token: Optional[str] = None) -> str:
         """Manually set the current stage. Requires --force if checklist has unchecked items."""
         # Validate stage exists
         if stage not in self.config.stages:
             valid_stages = list(self.config.stages.keys())
-            return f"❌ Error: Invalid stage '{stage}'. Valid stages: {valid_stages}"
+            return t('controller.set.invalid_stage', stage=stage, valid_stages=valid_stages)
 
         # Always validate token when --force is used (security consistency)
         if force:
             if not token:
-                return "❌ Error: --force requires USER-APPROVE token. Use: flow set STAGE --force --token YOUR_TOKEN"
+                return t('controller.set.force_token_required')
             if not verify_token(token):
-                return "❌ Error: Invalid token for --force."
+                return t('controller.set.force_invalid_token')
 
         # Check for unchecked items in current checklist
         unchecked = [i for i in self.state.checklist if not i.checked]
         if unchecked and not force:
             unchecked_texts = [f"  - {i.text}" for i in unchecked[:5]]
             if len(unchecked) > 5:
-                unchecked_texts.append(f"  ... and {len(unchecked) - 5} more")
+                unchecked_texts.append(t('controller.set.unchecked_more', count=len(unchecked) - 5))
             return (
-                f"❌ Cannot change stage: {len(unchecked)} unchecked items remain.\n"
+                t('controller.set.unchecked_remain', count=len(unchecked)) + "\n"
                 + "\n".join(unchecked_texts) + "\n\n"
-                + "Use --force --token YOUR_TOKEN to override."
+                + t('controller.set.unchecked_override')
             )
 
         # Record audit log if forcing with unchecked items
@@ -508,16 +509,18 @@ class WorkflowController:
         self.state.save(self.config.state_file)
         self.engine.set_stage(stage)
 
-        prefix = "⚠️ [FORCED] " if (unchecked and force) else "✅ "
-        result = f"{prefix}Stage set to {stage}"
+        if unchecked and force:
+            result = t('controller.set.success_forced', stage=stage)
+        else:
+            result = t('controller.set.success', stage=stage)
         if module:
-            result += f" (module: {module})"
+            result += t('controller.set.success_module', module=module)
         return result + "\n" + self.status()
 
     def set_module(self, module: str) -> str:
         """Set active module without changing stage. Does not require --force."""
         if not module or not module.strip():
-            return "❌ Error: Module name is required."
+            return t('controller.module.name_required')
 
         old_module = self.state.active_module
         self.state.active_module = module
@@ -530,7 +533,7 @@ class WorkflowController:
             "stage": self.state.current_stage
         })
 
-        return f"✅ Module changed: {old_module} → {module}\n" + self.status()
+        return t('controller.module.changed', old=old_module, new=module) + "\n" + self.status()
 
     def _update_active_status_file(self, checklist_text: str, unchecked_indices: list = None):
         path = self.config.status_file
@@ -563,7 +566,7 @@ class WorkflowController:
             "module": self.context.data.get('active_module', 'unknown'),
             "summary": summary
         })
-        return f"✅ Recorded review from agent '{agent_name}' for stage {self.state.current_stage}."
+        return t('controller.review.recorded', agent=agent_name, stage=self.state.current_stage)
 
     def _verify_agent_review(self, agent_name: str) -> bool:
         """Searches logs for recent AGENT_REVIEW event matching current stage."""

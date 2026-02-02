@@ -52,3 +52,6 @@ class WorkflowConfigV2:
     guide_file: str = ""  # Optional: path to markdown guide for checklist sync
     state_file: str = ".workflow/state.json"
     secret_file: str = ".workflow/secret"
+
+    # Language setting (persisted in workflow.yaml)
+    language: str = ""  # Display language: "en", "ko", or "" for auto-detect

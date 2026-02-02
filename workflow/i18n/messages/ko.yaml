@@ -129,3 +129,116 @@ tutorial:
   prompt: "선택: "
   completed: "튜토리얼 완료!"
   section_not_found: "섹션을 찾을 수 없음: {name}"
+
+# Controller 메시지
+controller:
+  status:
+    not_initialized: "워크플로우가 초기화되지 않았습니다. 'set' 명령어를 사용하세요."
+    stage_not_found: "오류: 현재 스테이지 '{stage}'를 설정에서 찾을 수 없습니다."
+    header: "현재 스테이지: {code} ({label})"
+    module: "활성 모듈: {module}"
+    progress: "진행: {checked}/{total} 완료"
+    next_check: "→ 다음: `flow check {indices}`"
+    all_done: "→ 모든 항목 완료! 실행: `flow next`"
+
+  check:
+    token_required: "❌ 오류: [USER-APPROVE] 항목에 토큰이 필요합니다."
+    invalid_token: "❌ 오류: 잘못된 토큰: {text}"
+    agent_not_found: "❌ 오류: 현재 스테이지에서 '{agent}' 에이전트 리뷰를 로그에서 찾을 수 없습니다."
+    action_failed: "❌ 항목 {index} 액션 실패: {error}"
+    action_output_header: "   출력 (마지막 10줄):"
+    action_output_line: "   | {line}"
+    action_output_short: "   출력:"
+    action_skip_hint: "   → --skip-action으로 액션 없이 완료 표시 가능"
+    action_executed: "✅ 액션 실행됨: {command}"
+    action_output: "   출력: {output}"
+    action_skipped: "⚠️ 항목 {index} 액션 건너뜀: {action}"
+    checked: "체크됨: {text}"
+    invalid_index: "잘못된 인덱스: {index}"
+    agent_registered: "ℹ️  '{agent}' 에이전트 리뷰가 등록되었습니다."
+    no_tag_match: "ℹ️  태그 {tag}와 일치하는 미완료 항목이 없습니다."
+    tag_found: "ℹ️  태그 {tag}와 일치하는 항목 {count}개 발견: [{items}]"
+
+  next:
+    force_token_required: "❌ 오류: --force는 USER-APPROVE 토큰이 필요합니다. 사용법: flow next --force --token YOUR_TOKEN --reason \"...\""
+    force_invalid_token: "❌ 오류: --force용 토큰이 잘못되었습니다. USER-APPROVE가 필요합니다."
+    force_reason_required: "❌ 오류: 강제 전이에는 빈 문자열이 아닌 사유가 필수입니다."
+    unchecked_items: "진행할 수 없습니다. 미완료 항목:"
+    unchecked_item: "- {text}"
+    end_of_sequence: "시퀀스 끝. 다음 스테이지가 정의되지 않았습니다."
+    invalid_target: "잘못된 대상 '{target}'. 유효한 선택: {choices}"
+    branching_point: "분기점입니다. 대상을 지정하세요. 선택: {choices}"
+    validation_failed: "진행할 수 없습니다. 시스템 검증 실패:"
+    validation_error: "❌ {error}"
+    success: "{stage}로 전이 완료"
+    success_forced: "⚠️ [강제] {stage}로 전이 완료"
+    success_skip_conditions: "⚠️ [조건건너뜀] {stage}로 전이 완료"
+
+  set:
+    invalid_stage: "❌ 오류: 잘못된 스테이지 '{stage}'. 유효한 스테이지: {valid_stages}"
+    force_token_required: "❌ 오류: --force는 USER-APPROVE 토큰이 필요합니다. 사용법: flow set STAGE --force --token YOUR_TOKEN"
+    force_invalid_token: "❌ 오류: --force용 토큰이 잘못되었습니다."
+    unchecked_remain: "❌ 스테이지 변경 불가: 미완료 항목 {count}개가 남아있습니다."
+    unchecked_more: "  ... 외 {count}개"
+    unchecked_override: "--force --token YOUR_TOKEN으로 무시 가능합니다."
+    success: "✅ 스테이지가 {stage}로 설정됨"
+    success_forced: "⚠️ [강제] 스테이지가 {stage}로 설정됨"
+    success_module: " (모듈: {module})"
+
+  module:
+    name_required: "❌ 오류: 모듈 이름이 필요합니다."
+    changed: "✅ 모듈 변경됨: {old} → {new}"
+
+  review:
+    recorded: "✅ 스테이지 {stage}에서 에이전트 '{agent}'의 리뷰가 기록되었습니다."
+
+  action:
+    args_required: "이 액션에는 --args가 필요합니다. 사용법: flow check N --args \"your arguments\""
+    timeout: "5분 후 액션 시간 초과"
+
+# CLI 메시지
+cli:
+  check_error: "❌ 오류: 인덱스 또는 --tag가 필요합니다"
+  module_usage: "사용법: flow module set <name>"
+  alias:
+    no_config: "쉘 설정 파일(.zshrc, .bashrc)을 찾을 수 없습니다."
+    add_manually: "다음 줄을 수동으로 추가하세요:\n  {line}"
+    already_exists: "별칭 '{name}'이(가) 이미 {config}에 존재합니다"
+    success: "성공! 별칭 '{name}'을(를) {config}에 추가했습니다"
+    activate: "활성화하려면 실행: source {config}"
+
+# Init 메시지
+init:
+  workflow_exists: "⚠️  workflow.yaml이 이미 존재합니다 (덮어쓰려면 --force 사용)"
+  workflow_created: "✅ workflow.yaml 생성됨 ({template} 템플릿)"
+  state_exists: "⚠️  .workflow/state.json이 이미 존재합니다"
+  state_created: "✅ .workflow/state.json 생성됨 (스테이지: {stage})"
+  using_first_stage: "ℹ️  workflow.yaml의 첫 번째 스테이지 사용: {stage}"
+  guide_exists: "⚠️  PROJECT_MANAGEMENT_GUIDE.md가 이미 존재합니다"
+  guide_created: "✅ .workflow/docs/PROJECT_MANAGEMENT_GUIDE.md 생성됨"
+  instructions_created: "✅ .workflow/WORKFLOW_INSTRUCTIONS.md 생성됨"
+  claude_md_guidance: "📋 CLAUDE.md가 이미 존재합니다. 다음 줄을 추가하세요:"
+  claude_md_top: "1. CLAUDE.md 상단에 추가:"
+  claude_md_import: "   @import .workflow/ACTIVE_STATUS.md"
+  claude_md_section: "2. 다음 파일에서 워크플로우 섹션 추가:"
+  claude_md_source: "   .workflow/WORKFLOW_INSTRUCTIONS.md"
+  claude_md_created: "✅ CLAUDE.md 생성됨 (최소 템플릿)"
+  gitignore_suggestion: "💡 .gitignore에 추가 권장:"
+  gitignore_create: "💡 다음 내용으로 .gitignore 생성:"
+  success: "🎉 '{template}' 워크플로우로 프로젝트 초기화 완료!"
+  next_steps: "다음 단계:"
+  step_status: "  1. 실행: flow status"
+  step_secret: "  2. 실행: flow secret-generate  (USER-APPROVE용)"
+  step_work: "  3. 체크리스트 작업 시작"
+  for_ai: "AI 어시스턴트용:"
+  ai_claude_md: "  - CLAUDE.md에 워크플로우 지침 포함"
+  ai_status: "  - AI는 각 세션 시작 시 'flow status' 실행 필요"
+
+# Auth 메시지
+auth:
+  title: "=== 워크플로우 비밀 생성 ==="
+  prompt: "해시할 평문 토큰 입력: "
+  confirm: "토큰 확인: "
+  empty_error: "오류: 토큰은 비어있을 수 없습니다."
+  mismatch_error: "오류: 토큰이 일치하지 않습니다."
+  success: "성공: SHA-256 해시가 {path}에 저장됨"

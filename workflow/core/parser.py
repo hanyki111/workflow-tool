@@ -115,7 +115,8 @@ class ConfigParserV2:
             status_file=status_file,
             guide_file=guide_file,
             state_file=data.get('state_file', ".workflow/state.json"),
-            secret_file=data.get('secret_file', ".workflow/secret")
+            secret_file=data.get('secret_file', ".workflow/secret"),
+            language=data.get('language', "")
         )
 
         # Validate Graph Integrity

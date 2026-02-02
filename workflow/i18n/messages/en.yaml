@@ -129,3 +129,116 @@ tutorial:
   prompt: "Enter choice: "
   completed: "Tutorial completed!"
   section_not_found: "Section not found: {name}"
+
+# Controller messages
+controller:
+  status:
+    not_initialized: "Workflow not initialized. Use 'set' command."
+    stage_not_found: "Error: Current stage '{stage}' not found in config."
+    header: "Current Stage: {code} ({label})"
+    module: "Active Module: {module}"
+    progress: "Progress: {checked}/{total} completed"
+    next_check: "→ Next: `flow check {indices}`"
+    all_done: "→ All items done! Run: `flow next`"
+
+  check:
+    token_required: "❌ Error: Token required for [USER-APPROVE] item."
+    invalid_token: "❌ Error: Invalid token for: {text}"
+    agent_not_found: "❌ Error: Agent review from '{agent}' not found in logs for current stage."
+    action_failed: "❌ Action failed for item {index}: {error}"
+    action_output_header: "   Output (last 10 lines):"
+    action_output_line: "   | {line}"
+    action_output_short: "   Output:"
+    action_skip_hint: "   → Use --skip-action to mark as done without running action"
+    action_executed: "✅ Action executed: {command}"
+    action_output: "   Output: {output}"
+    action_skipped: "⚠️ Action skipped for item {index}: {action}"
+    checked: "Checked: {text}"
+    invalid_index: "Invalid index: {index}"
+    agent_registered: "ℹ️  Agent review from '{agent}' registered."
+    no_tag_match: "ℹ️  No unchecked items found with tag: {tag}"
+    tag_found: "ℹ️  Found {count} items with tag {tag}: [{items}]"
+
+  next:
+    force_token_required: "❌ Error: --force requires USER-APPROVE token. Use: flow next --force --token YOUR_TOKEN --reason \"...\""
+    force_invalid_token: "❌ Error: Invalid token for --force. USER-APPROVE required."
+    force_reason_required: "❌ Error: A non-empty reason is mandatory for a forced transition."
+    unchecked_items: "Cannot proceed. Unchecked items:"
+    unchecked_item: "- {text}"
+    end_of_sequence: "End of sequence. No next stage defined."
+    invalid_target: "Invalid target '{target}'. Valid choices: {choices}"
+    branching_point: "Branching point. Please specify target. Choices: {choices}"
+    validation_failed: "Cannot proceed. System validation failed:"
+    validation_error: "❌ {error}"
+    success: "Transitioned to {stage}"
+    success_forced: "⚠️ [FORCED] Transitioned to {stage}"
+    success_skip_conditions: "⚠️ [SKIP-CONDITIONS] Transitioned to {stage}"
+
+  set:
+    invalid_stage: "❌ Error: Invalid stage '{stage}'. Valid stages: {valid_stages}"
+    force_token_required: "❌ Error: --force requires USER-APPROVE token. Use: flow set STAGE --force --token YOUR_TOKEN"
+    force_invalid_token: "❌ Error: Invalid token for --force."
+    unchecked_remain: "❌ Cannot change stage: {count} unchecked items remain."
+    unchecked_more: "  ... and {count} more"
+    unchecked_override: "Use --force --token YOUR_TOKEN to override."
+    success: "✅ Stage set to {stage}"
+    success_forced: "⚠️ [FORCED] Stage set to {stage}"
+    success_module: " (module: {module})"
+
+  module:
+    name_required: "❌ Error: Module name is required."
+    changed: "✅ Module changed: {old} → {new}"
+
+  review:
+    recorded: "✅ Recorded review from agent '{agent}' for stage {stage}."
+
+  action:
+    args_required: "This action requires --args. Usage: flow check N --args \"your arguments\""
+    timeout: "Action timed out after 5 minutes"
+
+# CLI messages
+cli:
+  check_error: "❌ Error: Either indices or --tag is required"
+  module_usage: "Usage: flow module set <name>"
+  alias:
+    no_config: "Could not find shell config file (.zshrc, .bashrc)."
+    add_manually: "Please add this line manually:\n  {line}"
+    already_exists: "Alias '{name}' already exists in {config}"
+    success: "Success! Added alias '{name}' to {config}"
+    activate: "Run this to activate: source {config}"
+
+# Init messages
+init:
+  workflow_exists: "⚠️  workflow.yaml already exists (use --force to overwrite)"
+  workflow_created: "✅ Created workflow.yaml ({template} template)"
+  state_exists: "⚠️  .workflow/state.json already exists"
+  state_created: "✅ Created .workflow/state.json (stage: {stage})"
+  using_first_stage: "ℹ️  Using first stage from workflow.yaml: {stage}"
+  guide_exists: "⚠️  PROJECT_MANAGEMENT_GUIDE.md already exists"
+  guide_created: "✅ Created .workflow/docs/PROJECT_MANAGEMENT_GUIDE.md"
+  instructions_created: "✅ Created .workflow/WORKFLOW_INSTRUCTIONS.md"
+  claude_md_guidance: "📋 CLAUDE.md already exists. Add these lines:"
+  claude_md_top: "1. At the TOP of CLAUDE.md, add:"
+  claude_md_import: "   @import .workflow/ACTIVE_STATUS.md"
+  claude_md_section: "2. Add the workflow section from:"
+  claude_md_source: "   .workflow/WORKFLOW_INSTRUCTIONS.md"
+  claude_md_created: "✅ Created CLAUDE.md (minimal template)"
+  gitignore_suggestion: "💡 Consider adding to .gitignore:"
+  gitignore_create: "💡 Create .gitignore with:"
+  success: "🎉 Project initialized with '{template}' workflow!"
+  next_steps: "Next steps:"
+  step_status: "  1. Run: flow status"
+  step_secret: "  2. Run: flow secret-generate  (for USER-APPROVE)"
+  step_work: "  3. Start working through the checklist"
+  for_ai: "For AI assistants:"
+  ai_claude_md: "  - CLAUDE.md contains workflow instructions"
+  ai_status: "  - AI should run 'flow status' at start of each session"
+
+# Auth messages
+auth:
+  title: "=== Workflow Secret Generation ==="
+  prompt: "Enter plaintext token to hash: "
+  confirm: "Confirm token: "
+  empty_error: "Error: Token cannot be empty."
+  mismatch_error: "Error: Tokens do not match."
+  success: "Success: SHA-256 hash saved to {path}"

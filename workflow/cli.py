@@ -2,6 +2,8 @@ import argparse
 import sys
 import os
 
+import yaml
+
 from .core.controller import WorkflowController
 from .core.auth import generate_secret_interactive
 from .i18n import t, set_language
@@ -16,8 +18,19 @@ def main():
     pre_parser.add_argument("--lang", "-l", help="Set display language (en, ko)")
     pre_args, _ = pre_parser.parse_known_args()
 
-    # Detect and set language
-    lang = detect_language(cli_lang=pre_args.lang)
+    # Read language from workflow.yaml if it exists
+    config_lang = None
+    if os.path.exists("workflow.yaml"):
+        try:
+            with open("workflow.yaml", 'r', encoding='utf-8') as f:
+                config = yaml.safe_load(f)
+                if config:
+                    config_lang = config.get('language')
+        except Exception:
+            pass  # Ignore errors, fall back to other detection methods
+
+    # Detect and set language (CLI > env > config > locale > default)
+    lang = detect_language(cli_lang=pre_args.lang, config_lang=config_lang)
     set_language(lang)
 
     # Main parser with localized help
@@ -279,7 +292,7 @@ def main():
                 # Index-based check
                 print(ctrl.check(args.indices, token=args.token, evidence=args.evidence, args=args.args, skip_action=args.skip_action, agent=getattr(args, 'agent', None)))
             else:
-                print("❌ Error: Either indices or --tag is required")
+                print(t('cli.check_error'))
         elif args.command == "set":
             print(ctrl.set_stage(args.stage, module=args.module, force=args.force, token=args.token))
         elif args.command == "review":
@@ -292,7 +305,7 @@ def main():
             if args.module_command == "set":
                 print(ctrl.set_module(args.name))
             else:
-                print("Usage: flow module set <name>")
+                print(t('cli.module_usage'))
         else:
             parser.print_help()
 
@@ -320,22 +333,22 @@ def install_alias(name: str):
             break
 
     if not target_config:
-        print("Could not find shell config file (.zshrc, .bashrc).")
-        print(f"Please add this line manually:\n  {alias_line}")
+        print(t('cli.alias.no_config'))
+        print(t('cli.alias.add_manually', line=alias_line))
         return
 
     # Check if already exists
     with open(target_config, 'r') as f:
         content = f.read()
         if f"alias {name}=" in content:
-            print(f"Alias '{name}' already exists in {target_config}")
+            print(t('cli.alias.already_exists', name=name, config=target_config))
             return
 
     with open(target_config, 'a') as f:
         f.write(f"\n# AI Workflow Tool\n{alias_line}\n")
 
-    print(f"Success! Added alias '{name}' to {target_config}")
-    print(f"Run this to activate: source {target_config}")
+    print(t('cli.alias.success', name=name, config=target_config))
+    print(t('cli.alias.activate', config=target_config))
 
 
 if __name__ == "__main__":

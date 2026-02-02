@@ -3,6 +3,8 @@ import os
 import getpass
 from typing import Optional
 
+from workflow.i18n import t
+
 SECRET_FILE = ".workflow/secret"
 
 def hash_token(token: str) -> str:
@@ -30,17 +32,17 @@ def verify_token(input_token: str) -> bool:
 
 def generate_secret_interactive():
     """Prompts for token and saves hash."""
-    print("=== Workflow Secret Generation ===")
-    token = getpass.getpass("Enter plaintext token to hash: ")
+    print(t('auth.title'))
+    token = getpass.getpass(t('auth.prompt'))
     if not token:
-        print("Error: Token cannot be empty.")
+        print(t('auth.empty_error'))
         return False
-    
-    confirm = getpass.getpass("Confirm token: ")
+
+    confirm = getpass.getpass(t('auth.confirm'))
     if token != confirm:
-        print("Error: Tokens do not match.")
+        print(t('auth.mismatch_error'))
         return False
-    
+
     save_secret_hash(token)
-    print(f"Success: SHA-256 hash saved to {SECRET_FILE}")
+    print(t('auth.success', path=SECRET_FILE))
     return True
