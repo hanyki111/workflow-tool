@@ -1,8 +1,14 @@
 import argparse
 import sys
 import os
+import io
 
 import yaml
+
+# Fix Windows console encoding for Unicode (emoji) support
+if sys.platform == 'win32':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 from .core.controller import WorkflowController
 from .core.auth import generate_secret_interactive
