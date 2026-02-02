@@ -113,7 +113,7 @@ The AI Workflow Engine solves these by:
 
 ```bash
 # 1. Clone and install
-git clone https://github.com/hanyki111workflow-tool.git
+git clone https://github.com/hanyki111/workflow-tool.git
 cd workflow-tool
 pip install -e .
 
@@ -201,7 +201,7 @@ flow next             # Move to next stage
 
 ```bash
 # Clone the repository
-git clone https://github.com/hanyki111workflow-tool.git
+git clone https://github.com/hanyki111/workflow-tool.git
 cd workflow-tool
 
 # Create virtual environment (recommended)
@@ -1458,7 +1458,7 @@ python -c "import yaml; yaml.safe_load(open('workflow.yaml'))"
 1. **Tutorial**: `flow tutorial`
 2. **Command Help**: `flow <command> --help`
 3. **Documentation**: `.workflow/docs/`
-4. **Issues**: https://github.com/hanyki111workflow-tool/issues
+4. **Issues**: https://github.com/hanyki111/workflow-tool/issues
 
 ---
 
@@ -1468,7 +1468,7 @@ python -c "import yaml; yaml.safe_load(open('workflow.yaml'))"
 
 ```bash
 # Clone repository
-git clone https://github.com/hanyki111workflow-tool.git
+git clone https://github.com/hanyki111/workflow-tool.git
 cd workflow-tool
 
 # Create virtual environment
