@@ -125,7 +125,7 @@ AI 워크플로우 엔진은 다음을 통해 이를 해결합니다:
 
 ```bash
 # 1. 클론 및 설치
-git clone https://github.com/hanyki111workflow-tool.git
+git clone https://github.com/hanyki111/workflow-tool.git
 cd workflow-tool
 pip install -e .
 
@@ -213,7 +213,7 @@ flow next             # 다음 스테이지로 이동
 
 ```bash
 # 저장소 클론
-git clone https://github.com/hanyki111workflow-tool.git
+git clone https://github.com/hanyki111/workflow-tool.git
 cd workflow-tool
 
 # 가상환경 생성 (권장)
@@ -1539,7 +1539,7 @@ flow status  # 새 상태 생성
 1. **튜토리얼**: `flow tutorial`
 2. **명령어 도움말**: `flow <command> --help`
 3. **문서**: `.workflow/docs/`
-4. **이슈**: https://github.com/hanyki111workflow-tool/issues
+4. **이슈**: https://github.com/hanyki111/workflow-tool/issues
 
 ---
 
@@ -1549,7 +1549,7 @@ flow status  # 새 상태 생성
 
 ```bash
 # 저장소 클론
-git clone https://github.com/hanyki111workflow-tool.git
+git clone https://github.com/hanyki111/workflow-tool.git
 cd workflow-tool
 
 # 가상환경 생성
