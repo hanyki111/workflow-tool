@@ -19,7 +19,7 @@ custom-plugins/
 │   └── state.json
 ├── validators/
 │   ├── __init__.py
-│   └── custom.py           # 커스텀 검증기 구현
+│   └── crustom.py           # 커스텀 검증기 구현
 └── README.ko.md
 ```
 

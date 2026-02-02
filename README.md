@@ -120,10 +120,14 @@ pip install -e .
 # 2. Check it works
 flow --help
 
-# 3. See current status
+# 3. Initialize workflow in your project
+cd /path/to/your-project
+flow init --template simple  # or "full" for advanced workflow
+
+# 4. See current status
 flow status
 
-# 4. Start the tutorial
+# 5. Start the tutorial
 flow tutorial
 ```
 
@@ -386,6 +390,41 @@ stages:
 ---
 
 ## Commands Reference
+
+### `flow init`
+
+Initialize a new workflow in your project directory. Creates `workflow.yaml`, `.workflow/` directory, and optionally generates `CLAUDE.md` for AI agents.
+
+```bash
+# Initialize with simple 4-stage workflow (recommended for beginners)
+flow init --template simple
+
+# Initialize with full M0-M4, P1-P7 dual-track workflow
+flow init --template full
+
+# Specify project name
+flow init --template simple --name my-project
+
+# Skip CLAUDE.md generation
+flow init --no-claude-md
+
+# Force overwrite existing files
+flow init --force
+
+# List available templates
+flow init --list-templates
+```
+
+**Options:**
+
+| Option | Description |
+|--------|-------------|
+| `--template`, `-t` | Template to use: `simple` or `full` (default: simple) |
+| `--name`, `-n` | Project name (default: current directory name) |
+| `--no-claude-md` | Don't generate CLAUDE.md file |
+| `--no-guide` | Don't generate workflow guide file |
+| `--force`, `-f` | Overwrite existing files |
+| `--list-templates` | Show available templates and exit |
 
 ### `flow status`
 

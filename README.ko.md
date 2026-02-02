@@ -132,10 +132,14 @@ pip install -e .
 # 2. 작동 확인
 flow --help
 
-# 3. 현재 상태 보기
+# 3. 프로젝트에 워크플로우 초기화
+cd /path/to/your-project
+flow init --template simple  # 또는 고급 워크플로우는 "full"
+
+# 4. 현재 상태 보기
 flow status
 
-# 4. 튜토리얼 시작
+# 5. 튜토리얼 시작
 flow tutorial
 ```
 
@@ -361,6 +365,41 @@ stages:
 ---
 
 ## 명령어 레퍼런스
+
+### `flow init`
+
+프로젝트 디렉토리에 새 워크플로우를 초기화합니다. `workflow.yaml`, `.workflow/` 디렉토리를 생성하고, 선택적으로 AI 에이전트용 `CLAUDE.md`를 생성합니다.
+
+```bash
+# 간단한 4단계 워크플로우로 초기화 (초보자 권장)
+flow init --template simple
+
+# 전체 M0-M4, P1-P7 듀얼 트랙 워크플로우로 초기화
+flow init --template full
+
+# 프로젝트 이름 지정
+flow init --template simple --name my-project
+
+# CLAUDE.md 생성 건너뛰기
+flow init --no-claude-md
+
+# 기존 파일 강제 덮어쓰기
+flow init --force
+
+# 사용 가능한 템플릿 목록 보기
+flow init --list-templates
+```
+
+**옵션:**
+
+| 옵션 | 설명 |
+|------|------|
+| `--template`, `-t` | 사용할 템플릿: `simple` 또는 `full` (기본값: simple) |
+| `--name`, `-n` | 프로젝트 이름 (기본값: 현재 디렉토리 이름) |
+| `--no-claude-md` | CLAUDE.md 파일을 생성하지 않음 |
+| `--no-guide` | 워크플로우 가이드 파일을 생성하지 않음 |
+| `--force`, `-f` | 기존 파일 덮어쓰기 |
+| `--list-templates` | 사용 가능한 템플릿 표시 후 종료 |
 
 ### `flow status`
 
