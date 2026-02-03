@@ -73,6 +73,13 @@ help:
     force: "기존 파일 덮어쓰기"
     list_templates: "사용 가능한 템플릿 보기"
 
+  install_wrappers:
+    description: "워크플로우 자동 통합을 위한 쉘 래퍼 생성"
+    shell: "대상 쉘 (bash, zsh, powershell, fish, auto)"
+    list: "설치하지 않고 래퍼 목록만 표시"
+    dry_run: "실제 변경 없이 미리보기"
+    uninstall: "설치된 래퍼 제거"
+
 commands:
   status:
     title: "현재 스테이지"
@@ -242,3 +249,24 @@ auth:
   empty_error: "오류: 토큰은 비어있을 수 없습니다."
   mismatch_error: "오류: 토큰이 일치하지 않습니다."
   success: "성공: SHA-256 해시가 {path}에 저장됨"
+
+# 래퍼 메시지
+wrappers:
+  detected_shell: "감지된 쉘: {shell}"
+  no_tags: "workflow.yaml에서 [CMD:xxx] 태그를 찾을 수 없습니다"
+  found_tags: "{count}개의 명령어 태그 발견:"
+  generating: "래퍼 생성 중..."
+  created: "생성됨: {path}"
+  removed: "제거됨: {path}"
+  not_found: "찾을 수 없음: {path}"
+  source_added: "{config}에 source 라인 추가됨"
+  source_exists: "{config}에 source 라인이 이미 존재합니다"
+  no_source_found: "{config}에서 source 라인을 찾을 수 없습니다"
+  success: "래퍼가 설치되었습니다! 활성화: source {config}"
+  uninstalled: "{config}에서 래퍼가 제거되었습니다"
+  list_header: "생성될 래퍼 목록:"
+  list_item: "  {cmd} -> flow check --tag \"{tag}\""
+  dry_run_header: "Dry run - 적용될 변경사항:"
+  would_create: "생성 예정: {path}"
+  would_add_source: "source 라인 추가 예정: {config}"
+  wrapper_preview: "래퍼 파일 내용:"

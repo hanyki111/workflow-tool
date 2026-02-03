@@ -73,6 +73,13 @@ help:
     force: "Overwrite existing files"
     list_templates: "Show available templates"
 
+  install_wrappers:
+    description: "Generate shell wrappers for automatic workflow integration"
+    shell: "Target shell (bash, zsh, powershell, fish, auto)"
+    list: "List wrappers without installing"
+    dry_run: "Preview changes without applying"
+    uninstall: "Remove installed wrappers"
+
 commands:
   status:
     title: "Current Stage"
@@ -242,3 +249,24 @@ auth:
   empty_error: "Error: Token cannot be empty."
   mismatch_error: "Error: Tokens do not match."
   success: "Success: SHA-256 hash saved to {path}"
+
+# Wrappers messages
+wrappers:
+  detected_shell: "Detected shell: {shell}"
+  no_tags: "No [CMD:xxx] tags found in workflow.yaml"
+  found_tags: "Found {count} command tags:"
+  generating: "Generating wrappers..."
+  created: "Created: {path}"
+  removed: "Removed: {path}"
+  not_found: "Not found: {path}"
+  source_added: "Added source line to {config}"
+  source_exists: "Source line already exists in {config}"
+  no_source_found: "No source line found in {config}"
+  success: "Wrappers installed! Activate with: source {config}"
+  uninstalled: "Wrappers removed from {config}"
+  list_header: "Wrappers to be generated:"
+  list_item: "  {cmd} -> flow check --tag \"{tag}\""
+  dry_run_header: "Dry run - changes that would be made:"
+  would_create: "Would create: {path}"
+  would_add_source: "Would add source line to: {config}"
+  wrapper_preview: "Wrapper file content:"

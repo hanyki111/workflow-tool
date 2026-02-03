@@ -16,6 +16,7 @@ from .i18n import t, set_language
 from .i18n.detector import detect_language
 from .tutorial import run_tutorial
 from .init import init_project, show_templates
+from .wrappers import install_wrappers, uninstall_wrappers, list_wrappers
 
 
 def main():
@@ -253,6 +254,33 @@ def main():
         help=t('help.init.list_templates')
     )
 
+    # Install Wrappers
+    wrappers_parser = subparsers.add_parser(
+        "install-wrappers",
+        help=t('help.install_wrappers.description')
+    )
+    wrappers_parser.add_argument(
+        "--shell",
+        choices=["bash", "zsh", "powershell", "fish", "auto"],
+        default="auto",
+        help=t('help.install_wrappers.shell')
+    )
+    wrappers_parser.add_argument(
+        "--list", "-L",
+        action="store_true",
+        help=t('help.install_wrappers.list')
+    )
+    wrappers_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help=t('help.install_wrappers.dry_run')
+    )
+    wrappers_parser.add_argument(
+        "--uninstall",
+        action="store_true",
+        help=t('help.install_wrappers.uninstall')
+    )
+
     args = parser.parse_args()
 
     # Handle tutorial command (doesn't need WorkflowController)
@@ -281,6 +309,18 @@ def main():
                 force=args.force
             )
             print(output)
+        return
+
+    # Handle install-wrappers command (doesn't need WorkflowController)
+    if args.command == "install-wrappers":
+        if args.list:
+            print(list_wrappers())
+        elif args.uninstall:
+            shell = args.shell if args.shell != "auto" else None
+            print(uninstall_wrappers(shell=shell))
+        else:
+            shell = args.shell if args.shell != "auto" else None
+            print(install_wrappers(shell=shell, dry_run=args.dry_run))
         return
 
     try:
