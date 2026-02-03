@@ -270,3 +270,6 @@ wrappers:
   would_create: "생성 예정: {path}"
   would_add_source: "source 라인 추가 예정: {config}"
   wrapper_preview: "래퍼 파일 내용:"
+  cmd_path_hint: "이 디렉토리를 PATH에 추가하세요: {path}"
+  cmd_path_instruction: "실행: set PATH=%PATH%;{path}"
+  cmd_path_remove_hint: "PATH에서 래퍼 디렉토리를 제거하는 것을 잊지 마세요"

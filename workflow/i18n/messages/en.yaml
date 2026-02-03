@@ -270,3 +270,6 @@ wrappers:
   would_create: "Would create: {path}"
   would_add_source: "Would add source line to: {config}"
   wrapper_preview: "Wrapper file content:"
+  cmd_path_hint: "Add this directory to your PATH: {path}"
+  cmd_path_instruction: "Run: set PATH=%PATH%;{path}"
+  cmd_path_remove_hint: "Remember to remove the wrapper directory from your PATH"

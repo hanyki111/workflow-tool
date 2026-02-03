@@ -261,7 +261,7 @@ def main():
     )
     wrappers_parser.add_argument(
         "--shell",
-        choices=["bash", "zsh", "powershell", "fish", "auto"],
+        choices=["bash", "zsh", "powershell", "cmd", "fish", "auto"],
         default="auto",
         help=t('help.install_wrappers.shell')
     )

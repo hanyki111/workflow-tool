@@ -85,10 +85,14 @@ def detect_shell() -> str:
     """Detect the current shell environment.
 
     Returns:
-        Shell name: 'bash', 'zsh', 'powershell', or 'fish'
+        Shell name: 'bash', 'zsh', 'powershell', 'cmd', or 'fish'
     """
     if sys.platform == 'win32':
-        return 'powershell'
+        # Check if running in CMD or PowerShell
+        # PSModulePath is typically set in PowerShell
+        if os.environ.get('PSModulePath'):
+            return 'powershell'
+        return 'cmd'
 
     shell = os.environ.get('SHELL', '')
     if 'zsh' in shell:
@@ -102,7 +106,7 @@ def get_shell_config_path(shell: str) -> Optional[Path]:
     """Get the path to shell configuration file.
 
     Args:
-        shell: Shell name (bash, zsh, powershell, fish)
+        shell: Shell name (bash, zsh, powershell, fish, cmd)
 
     Returns:
         Path to config file, or None if not found/applicable
@@ -137,6 +141,11 @@ def get_shell_config_path(shell: str) -> Optional[Path]:
             # PowerShell Core on Unix
             return home / '.config' / 'powershell' / 'Microsoft.PowerShell_profile.ps1'
 
+    elif shell == 'cmd':
+        # CMD doesn't have a standard config file
+        # Wrappers are installed as batch files in PATH
+        return None
+
     return None
 
 
@@ -148,7 +157,11 @@ def get_wrapper_file_path(shell: str) -> Path:
 
     Returns:
         Path to wrapper file in .workflow directory
+        For CMD, returns directory path where .bat files will be created
     """
+    if shell == 'cmd':
+        # CMD uses individual .bat files in a directory
+        return Path('.workflow') / 'wrappers'
     ext = 'ps1' if shell == 'powershell' else 'sh'
     return Path('.workflow') / f'wrappers.{ext}'
 
@@ -259,6 +272,108 @@ end
 '''
 
 
+def generate_cmd_wrapper(spec: WrapperSpec) -> str:
+    """Generate Windows CMD batch file wrapper.
+
+    Args:
+        spec: WrapperSpec for the command
+
+    Returns:
+        Batch file content
+    """
+    if spec.subcommand:
+        return f'''@echo off
+setlocal
+rem AI Workflow Tool wrapper for {spec.command} ({spec.tag})
+
+rem Call original command (assumes .exe is in PATH after wrapper dir)
+call {spec.command}.exe %*
+set _exitcode=%ERRORLEVEL%
+
+if %_exitcode% EQU 0 (
+    if /i "%~1"=="{spec.subcommand}" (
+        call flow check --tag "{spec.tag}" --evidence "Auto: exit 0" 2>nul
+    )
+)
+exit /b %_exitcode%
+'''
+    else:
+        return f'''@echo off
+setlocal
+rem AI Workflow Tool wrapper for {spec.command} ({spec.tag})
+
+rem Call original command (assumes .exe is in PATH after wrapper dir)
+call {spec.command}.exe %*
+set _exitcode=%ERRORLEVEL%
+
+if %_exitcode% EQU 0 (
+    call flow check --tag "{spec.tag}" --evidence "Auto: exit 0" 2>nul
+)
+exit /b %_exitcode%
+'''
+
+
+def generate_cmd_wrappers(specs: list[WrapperSpec]) -> dict[str, str]:
+    """Generate CMD batch files for each command.
+
+    Args:
+        specs: List of WrapperSpec objects
+
+    Returns:
+        Dict mapping filename to file content
+    """
+    # Group specs by command for subcommand handling
+    commands: dict[str, list[WrapperSpec]] = {}
+    for spec in specs:
+        if spec.command not in commands:
+            commands[spec.command] = []
+        commands[spec.command].append(spec)
+
+    files: dict[str, str] = {}
+    for cmd, cmd_specs in commands.items():
+        # For CMD, we create one .bat file per command
+        # that handles all subcommands
+        if len(cmd_specs) == 1 and cmd_specs[0].subcommand is None:
+            files[f"{cmd}.bat"] = generate_cmd_wrapper(cmd_specs[0])
+        else:
+            # Generate combined wrapper with all subcommands
+            files[f"{cmd}.bat"] = generate_cmd_combined_wrapper(cmd, cmd_specs)
+
+    return files
+
+
+def generate_cmd_combined_wrapper(command: str, specs: list[WrapperSpec]) -> str:
+    """Generate CMD wrapper for command with multiple subcommands.
+
+    Args:
+        command: Base command name
+        specs: List of specs for this command
+
+    Returns:
+        Batch file content
+    """
+    cases = []
+    for spec in specs:
+        if spec.subcommand:
+            cases.append(f'if /i "%~1"=="{spec.subcommand}" call flow check --tag "{spec.tag}" --evidence "Auto: exit 0" 2>nul')
+
+    case_block = '\n    '.join(cases)
+
+    return f'''@echo off
+setlocal
+rem AI Workflow Tool wrapper for {command}
+
+rem Call original command
+call {command}.exe %*
+set _exitcode=%ERRORLEVEL%
+
+if %_exitcode% EQU 0 (
+    {case_block}
+)
+exit /b %_exitcode%
+'''
+
+
 def generate_wrappers_file(specs: list[WrapperSpec], shell: str) -> str:
     """Generate complete wrappers file content.
 
@@ -267,7 +382,7 @@ def generate_wrappers_file(specs: list[WrapperSpec], shell: str) -> str:
         shell: Target shell
 
     Returns:
-        Complete file content
+        Complete file content (not used for CMD - use generate_cmd_wrappers instead)
     """
     # Group specs by command for subcommand handling
     commands: dict[str, list[WrapperSpec]] = {}
@@ -409,11 +524,48 @@ def install_wrappers(
     for spec in specs:
         output.append(f"  - {spec.command}" + (f":{spec.subcommand}" if spec.subcommand else "") + f" ({spec.stage})")
 
-    # Generate wrapper file content
-    wrapper_content = generate_wrappers_file(specs, shell)
     wrapper_path = get_wrapper_file_path(shell)
 
-    # Get shell config path
+    # CMD uses separate batch files
+    if shell == 'cmd':
+        cmd_files = generate_cmd_wrappers(specs)
+
+        if dry_run:
+            output.append("")
+            output.append(t('wrappers.dry_run_header'))
+            output.append(f"  {t('wrappers.would_create', path=str(wrapper_path) + '/')}")
+            for filename in cmd_files:
+                output.append(f"    - {filename}")
+            output.append("")
+            output.append(t('wrappers.cmd_path_hint', path=str(wrapper_path.resolve())))
+            output.append("")
+            output.append(t('wrappers.wrapper_preview'))
+            output.append("-" * 40)
+            for filename, content in cmd_files.items():
+                output.append(f"=== {filename} ===")
+                output.append(content)
+            output.append("-" * 40)
+            return '\n'.join(output)
+
+        # Create wrapper directory
+        wrapper_path.mkdir(parents=True, exist_ok=True)
+
+        output.append("")
+        output.append(t('wrappers.generating'))
+
+        for filename, content in cmd_files.items():
+            file_path = wrapper_path / filename
+            file_path.write_text(content, encoding='utf-8')
+            output.append(t('wrappers.created', path=str(file_path)))
+
+        output.append("")
+        output.append(t('wrappers.cmd_path_hint', path=str(wrapper_path.resolve())))
+        output.append(t('wrappers.cmd_path_instruction'))
+
+        return '\n'.join(output)
+
+    # Other shells use single wrapper file
+    wrapper_content = generate_wrappers_file(specs, shell)
     config_file = get_shell_config_path(shell)
     source_line = get_source_line(wrapper_path, shell)
 
@@ -480,6 +632,17 @@ def uninstall_wrappers(shell: Optional[str] = None) -> str:
 
     wrapper_path = get_wrapper_file_path(shell)
     config_file = get_shell_config_path(shell)
+
+    # CMD uses a directory of batch files
+    if shell == 'cmd':
+        if wrapper_path.exists() and wrapper_path.is_dir():
+            import shutil
+            shutil.rmtree(wrapper_path)
+            output.append(t('wrappers.removed', path=str(wrapper_path)))
+        else:
+            output.append(t('wrappers.not_found', path=str(wrapper_path)))
+        output.append(t('wrappers.cmd_path_remove_hint'))
+        return '\n'.join(output)
 
     # Remove wrapper file
     if wrapper_path.exists():

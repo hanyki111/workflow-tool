@@ -18,6 +18,8 @@ from workflow.wrappers import (
     generate_bash_wrapper,
     generate_powershell_wrapper,
     generate_fish_wrapper,
+    generate_cmd_wrapper,
+    generate_cmd_wrappers,
     generate_wrappers_file,
     install_wrappers,
     uninstall_wrappers,
@@ -200,9 +202,10 @@ class TestDetectShell:
                 assert detect_shell() == "fish"
 
     def test_detect_powershell_on_windows(self):
-        """Detect PowerShell on Windows."""
+        """Detect PowerShell on Windows when PSModulePath is set."""
         with patch.object(sys, 'platform', 'win32'):
-            assert detect_shell() == "powershell"
+            with patch.dict(os.environ, {"PSModulePath": "C:\\Windows\\System32"}):
+                assert detect_shell() == "powershell"
 
     def test_default_to_bash(self):
         """Default to bash when SHELL is empty."""
@@ -456,3 +459,154 @@ class TestListWrappers:
 
         # Should indicate no tags found
         assert "No" in result or "no" in result or "not" in result.lower()
+
+
+class TestDetectShellCmd:
+    """Test CMD shell detection."""
+
+    def test_detect_cmd_on_windows_without_psmodulepath(self):
+        """Detect CMD on Windows when PSModulePath is not set."""
+        with patch.object(sys, 'platform', 'win32'):
+            with patch.dict(os.environ, {"PSModulePath": ""}, clear=False):
+                # Remove PSModulePath if exists
+                env = os.environ.copy()
+                env.pop("PSModulePath", None)
+                with patch.dict(os.environ, env, clear=True):
+                    assert detect_shell() == "cmd"
+
+    def test_detect_powershell_on_windows_with_psmodulepath(self):
+        """Detect PowerShell on Windows when PSModulePath is set."""
+        with patch.object(sys, 'platform', 'win32'):
+            with patch.dict(os.environ, {"PSModulePath": "C:\\Program Files\\PowerShell\\Modules"}):
+                assert detect_shell() == "powershell"
+
+
+class TestGetWrapperFilePathCmd:
+    """Test CMD wrapper path generation."""
+
+    def test_cmd_wrapper_path(self):
+        """Get CMD wrapper directory path."""
+        path = get_wrapper_file_path("cmd")
+        assert path == Path(".workflow/wrappers")
+
+
+class TestGetShellConfigPathCmd:
+    """Test CMD config path (should be None)."""
+
+    def test_cmd_config_is_none(self):
+        """CMD has no config file."""
+        path = get_shell_config_path("cmd")
+        assert path is None
+
+
+class TestGenerateCmdWrapper:
+    """Test CMD batch file wrapper generation."""
+
+    def test_simple_wrapper(self):
+        """Generate simple CMD wrapper."""
+        spec = WrapperSpec(
+            command="pytest",
+            subcommand=None,
+            tag="CMD:pytest",
+            stage="P1",
+            text="[CMD:pytest] Run tests"
+        )
+        wrapper = generate_cmd_wrapper(spec)
+
+        assert "@echo off" in wrapper
+        assert "pytest.exe" in wrapper
+        assert "ERRORLEVEL" in wrapper
+        assert 'flow check --tag "CMD:pytest"' in wrapper
+        assert "exit /b" in wrapper
+
+    def test_subcommand_wrapper(self):
+        """Generate CMD wrapper with subcommand check."""
+        spec = WrapperSpec(
+            command="memory_tool",
+            subcommand="write",
+            tag="CMD:memory_tool:write",
+            stage="P1",
+            text="[CMD:memory_tool:write] Save docs"
+        )
+        wrapper = generate_cmd_wrapper(spec)
+
+        assert "@echo off" in wrapper
+        assert "memory_tool.exe" in wrapper
+        assert '"%~1"=="write"' in wrapper
+        assert 'flow check --tag "CMD:memory_tool:write"' in wrapper
+
+
+class TestGenerateCmdWrappers:
+    """Test CMD wrapper files generation."""
+
+    def test_generate_multiple_wrappers(self):
+        """Generate multiple .bat files."""
+        specs = [
+            WrapperSpec("pytest", None, "CMD:pytest", "P1", "[CMD:pytest] Run"),
+            WrapperSpec("mypy", None, "CMD:mypy", "P1", "[CMD:mypy] Check"),
+        ]
+        files = generate_cmd_wrappers(specs)
+
+        assert "pytest.bat" in files
+        assert "mypy.bat" in files
+        assert "pytest.exe" in files["pytest.bat"]
+        assert "mypy.exe" in files["mypy.bat"]
+
+    def test_combined_subcommand_wrapper(self):
+        """Generate combined wrapper for multiple subcommands."""
+        specs = [
+            WrapperSpec("git", "commit", "CMD:git:commit", "P1", "[CMD:git:commit]"),
+            WrapperSpec("git", "push", "CMD:git:push", "P1", "[CMD:git:push]"),
+        ]
+        files = generate_cmd_wrappers(specs)
+
+        assert "git.bat" in files
+        assert len(files) == 1  # Only one file for git
+        assert '"commit"' in files["git.bat"]
+        assert '"push"' in files["git.bat"]
+
+
+class TestInstallWrappersCmd:
+    """Test CMD wrapper installation."""
+
+    def test_cmd_dry_run(self, tmp_path):
+        """CMD dry run shows batch files."""
+        config = {
+            "version": "2.0",
+            "stages": {
+                "P1": {
+                    "label": "Test",
+                    "checklist": ["[CMD:pytest] Run tests"]
+                }
+            }
+        }
+        config_path = tmp_path / "workflow.yaml"
+        config_path.write_text(yaml.dump(config))
+
+        result = install_wrappers(shell="cmd", dry_run=True, config_path=str(config_path))
+
+        assert "pytest.bat" in result
+        assert "PATH" in result
+
+    def test_cmd_install_creates_directory(self, tmp_path, monkeypatch):
+        """CMD install creates wrapper directory with .bat files."""
+        config = {
+            "version": "2.0",
+            "stages": {
+                "P1": {
+                    "label": "Test",
+                    "checklist": ["[CMD:pytest] Run tests"]
+                }
+            }
+        }
+        config_path = tmp_path / "workflow.yaml"
+        config_path.write_text(yaml.dump(config))
+
+        # Change to tmp_path so .workflow is created there
+        monkeypatch.chdir(tmp_path)
+
+        result = install_wrappers(shell="cmd", config_path=str(config_path))
+
+        wrapper_dir = tmp_path / ".workflow" / "wrappers"
+        assert wrapper_dir.exists()
+        assert (wrapper_dir / "pytest.bat").exists()
