@@ -2,7 +2,7 @@ import re
 import yaml
 from typing import List, Optional, Dict, Any
 from .state import CheckItem
-from .schema import WorkflowConfigV2, StageConfig, TransitionConfig, ConditionConfig, ChecklistItemConfig
+from .schema import WorkflowConfigV2, StageConfig, TransitionConfig, ConditionConfig, ChecklistItemConfig, RalphConfig
 
 class GuideParser:
     def __init__(self, content: str):
@@ -80,12 +80,23 @@ class ConfigParserV2:
                 if isinstance(item, str):
                     checklist.append(item)
                 elif isinstance(item, dict):
+                    # Parse ralph config if present
+                    ralph_config = None
+                    ralph_data = item.get('ralph')
+                    if ralph_data:
+                        ralph_config = RalphConfig(
+                            enabled=ralph_data.get('enabled', True),  # Default to enabled if ralph section exists
+                            max_retries=ralph_data.get('max_retries', 5),
+                            hint=ralph_data.get('hint', '')
+                        )
+
                     checklist.append(ChecklistItemConfig(
                         text=item.get('text', ''),
                         action=item.get('action'),
                         require_args=item.get('require_args', False),
                         confirm=item.get('confirm', False),
-                        allowed_exit_codes=item.get('allowed_exit_codes', [0])
+                        allowed_exit_codes=item.get('allowed_exit_codes', [0]),
+                        ralph=ralph_config
                     ))
 
             stages[s_id] = StageConfig(

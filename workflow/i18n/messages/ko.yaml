@@ -220,6 +220,32 @@ controller:
     args_required: "이 액션에는 --args가 필요합니다. 사용법: flow check N --args \"your arguments\""
     timeout: "5분 후 액션 시간 초과"
 
+  ralph:
+    header: "🔄 [RALPH MODE] 액션 실패 (시도 {attempt}/{max_retries})"
+    goal: "목표: 이 명령어를 성공시키세요: `{action}`"
+    error_section: "에러:"
+    output_section: "출력 (마지막 부분):"
+    hint_section: "힌트:"
+    instruction: "📋 Task 서브에이전트 지침:"
+    instruction_1: "1. 위 에러를 분석하고 코드를 수정하세요"
+    instruction_2: "2. 수정 후 `flow check {index}`를 다시 실행하세요"
+    instruction_3: "3. 액션이 성공할 때까지 반복하세요"
+    max_retries_exceeded: "❌ [RALPH MODE] 항목 {index}의 최대 재시도 횟수 초과 ({max_retries}회). --skip-action으로 강제 체크 가능."
+    task_prompt: |
+      RALPH MODE입니다. 액션을 성공시키는 것이 목표입니다.
+
+      현재 시도: {attempt}/{max_retries}
+      액션: {action}
+
+      에러:
+      {error}
+
+      지침:
+      1. 에러를 분석하고 관련 코드를 수정하세요
+      2. `flow check {index}`로 재시도하세요
+      3. 실패하면 다시 분석하고 수정하세요
+      4. 성공하거나 최대 재시도 횟수에 도달할 때까지 계속하세요
+
 # CLI 메시지
 cli:
   check_error: "❌ 오류: 인덱스 또는 --tag가 필요합니다"

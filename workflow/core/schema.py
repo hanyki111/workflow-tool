@@ -19,6 +19,13 @@ class TransitionConfig:
     conditions: List[ConditionConfig] = field(default_factory=list)
 
 @dataclass
+class RalphConfig:
+    """Configuration for Ralph Loop mode - retry until success."""
+    enabled: bool = False
+    max_retries: int = 5
+    hint: str = ""  # Additional hint for AI when retrying
+
+@dataclass
 class ChecklistItemConfig:
     """Checklist item with optional action."""
     text: str
@@ -26,6 +33,7 @@ class ChecklistItemConfig:
     require_args: bool = False        # Whether action needs --args
     confirm: bool = False             # Ask for confirmation before action
     allowed_exit_codes: List[int] = field(default_factory=lambda: [0])  # Exit codes considered success
+    ralph: Optional[RalphConfig] = None  # Ralph Loop configuration
 
 @dataclass
 class StageConfig:

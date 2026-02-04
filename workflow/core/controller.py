@@ -5,7 +5,7 @@ import json
 import subprocess
 from datetime import datetime
 from .state import WorkflowState, CheckItem
-from .schema import WorkflowConfigV2, ChecklistItemConfig
+from .schema import WorkflowConfigV2, ChecklistItemConfig, RalphConfig
 from .parser import GuideParser, ConfigParserV2
 from .engine import WorkflowEngine
 from .validator import ValidatorRegistry
@@ -39,6 +39,109 @@ class WorkflowController:
 
     def _update_context_from_state(self):
         self.context.update("active_module", getattr(self.state, 'active_module', 'unknown'))
+
+    def _get_ralph_state_file(self) -> str:
+        """Get path to ralph state file."""
+        return os.path.join(os.path.dirname(self.config.state_file), "ralph_state.json")
+
+    def _get_ralph_state(self, index: int) -> Dict[str, Any]:
+        """Get ralph state for a specific item."""
+        ralph_file = self._get_ralph_state_file()
+        if os.path.exists(ralph_file):
+            try:
+                with open(ralph_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    if data.get('stage') == self.state.current_stage:
+                        return data.get('items', {}).get(str(index), {})
+            except Exception:
+                pass
+        return {}
+
+    def _update_ralph_state(self, index: int, error: str, output: str) -> int:
+        """Update ralph state and return current attempt count."""
+        ralph_file = self._get_ralph_state_file()
+        data = {'stage': self.state.current_stage, 'items': {}}
+
+        if os.path.exists(ralph_file):
+            try:
+                with open(ralph_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    # Reset if stage changed
+                    if data.get('stage') != self.state.current_stage:
+                        data = {'stage': self.state.current_stage, 'items': {}}
+            except Exception:
+                pass
+
+        item_state = data['items'].get(str(index), {'attempts': 0})
+        item_state['attempts'] = item_state.get('attempts', 0) + 1
+        item_state['last_error'] = error
+        item_state['last_output'] = output[:2000] if output else ''  # Limit output size
+        data['items'][str(index)] = item_state
+
+        os.makedirs(os.path.dirname(ralph_file), exist_ok=True)
+        with open(ralph_file, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+
+        return item_state['attempts']
+
+    def _clear_ralph_state(self, index: int):
+        """Clear ralph state for an item (on success)."""
+        ralph_file = self._get_ralph_state_file()
+        if os.path.exists(ralph_file):
+            try:
+                with open(ralph_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                if str(index) in data.get('items', {}):
+                    del data['items'][str(index)]
+                    with open(ralph_file, 'w', encoding='utf-8') as f:
+                        json.dump(data, f, indent=2, ensure_ascii=False)
+            except Exception:
+                pass
+
+    def _generate_ralph_prompt(self, index: int, item_config: ChecklistItemConfig,
+                               action_result: Dict[str, Any], attempt: int) -> str:
+        """Generate prompt for Task subagent to retry."""
+        ralph = item_config.ralph
+        max_retries = ralph.max_retries if ralph else 5
+        hint = ralph.hint if ralph and ralph.hint else ""
+
+        prompt_lines = [
+            t('controller.ralph.header', attempt=attempt, max_retries=max_retries),
+            "",
+            t('controller.ralph.goal', action=item_config.action),
+            "",
+            t('controller.ralph.error_section'),
+            f"```",
+            action_result.get('error', 'Unknown error')[:500],
+            f"```",
+            "",
+        ]
+
+        if action_result.get('output'):
+            output_preview = action_result['output'][-1000:]  # Last 1000 chars
+            prompt_lines.extend([
+                t('controller.ralph.output_section'),
+                f"```",
+                output_preview,
+                f"```",
+                "",
+            ])
+
+        if hint:
+            prompt_lines.extend([
+                t('controller.ralph.hint_section'),
+                hint,
+                "",
+            ])
+
+        prompt_lines.extend([
+            t('controller.ralph.instruction'),
+            t('controller.ralph.instruction_1'),
+            t('controller.ralph.instruction_2', index=index),
+            t('controller.ralph.instruction_3'),
+        ])
+
+        return "\n".join(prompt_lines)
 
     def status(self) -> str:
         if not self.state.current_stage:
@@ -163,6 +266,31 @@ class WorkflowController:
             if item_config and item_config.action and not skip_action:
                 action_result = self._execute_action(item_config, args)
                 if not action_result['success']:
+                    # Check if Ralph mode is enabled for this item
+                    if item_config.ralph and item_config.ralph.enabled:
+                        attempt = self._update_ralph_state(
+                            index,
+                            action_result.get('error', ''),
+                            action_result.get('output', '')
+                        )
+                        max_retries = item_config.ralph.max_retries
+
+                        if attempt <= max_retries:
+                            # Generate Ralph mode prompt for Task subagent
+                            ralph_prompt = self._generate_ralph_prompt(
+                                index, item_config, action_result, attempt
+                            )
+                            results.append(ralph_prompt)
+                            self.state.save(self.config.state_file)
+                            return "\n".join(results)
+                        else:
+                            # Max retries exceeded
+                            results.append(t('controller.ralph.max_retries_exceeded',
+                                           index=index, max_retries=max_retries))
+                            self._clear_ralph_state(index)
+                            continue
+
+                    # Normal failure handling (no Ralph mode)
                     results.append(t('controller.check.action_failed', index=index, error=action_result['error']))
                     # Show stdout if available (useful for test output, etc.)
                     if action_result.get('output'):
@@ -178,6 +306,10 @@ class WorkflowController:
                                 results.append(t('controller.check.action_output_line', line=line))
                     results.append(t('controller.check.action_skip_hint'))
                     continue
+
+                # Action succeeded - clear ralph state if any
+                if item_config.ralph:
+                    self._clear_ralph_state(index)
                 results.append(t('controller.check.action_executed', command=action_result['command']))
                 if action_result.get('output'):
                     results.append(t('controller.check.action_output', output=action_result['output'][:200]))

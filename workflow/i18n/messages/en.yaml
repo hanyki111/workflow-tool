@@ -220,6 +220,32 @@ controller:
     args_required: "This action requires --args. Usage: flow check N --args \"your arguments\""
     timeout: "Action timed out after 5 minutes"
 
+  ralph:
+    header: "🔄 [RALPH MODE] Action failed (attempt {attempt}/{max_retries})"
+    goal: "Goal: Make this command succeed: `{action}`"
+    error_section: "Error:"
+    output_section: "Output (last part):"
+    hint_section: "Hint:"
+    instruction: "📋 Instructions for Task subagent:"
+    instruction_1: "1. Analyze the error above and fix the code"
+    instruction_2: "2. After fixing, run `flow check {index}` again"
+    instruction_3: "3. Repeat until the action succeeds"
+    max_retries_exceeded: "❌ [RALPH MODE] Max retries exceeded for item {index} ({max_retries} attempts). Use --skip-action to force check."
+    task_prompt: |
+      You are in RALPH MODE. Your goal is to make the action succeed.
+
+      Current attempt: {attempt}/{max_retries}
+      Action: {action}
+
+      Error:
+      {error}
+
+      Instructions:
+      1. Analyze the error and fix the relevant code
+      2. Run `flow check {index}` to retry
+      3. If it fails again, analyze and fix again
+      4. Continue until success or max retries
+
 # CLI messages
 cli:
   check_error: "❌ Error: Either indices or --tag is required"
