@@ -31,6 +31,11 @@ help:
     skip_action: "액션 실행 건너뛰기 (수동 오버라이드)"
     agent: "체크 전 에이전트 리뷰 사전 등록 (예: --agent plan-critic)"
 
+  uncheck:
+    description: "체크리스트 항목 완료 해제 (check의 반대)"
+    indices: "항목 인덱스 (1부터 시작)"
+    token: "USER-APPROVE 항목용 비밀 토큰"
+
   set:
     description: "현재 스테이지/모듈 수동 설정"
     stage: "스테이지 코드 (예: M1, P2)"
@@ -102,6 +107,11 @@ commands:
     requires_token: "항목 {index}은(는) USER-APPROVE 토큰 필요"
     invalid_token: "USER-APPROVE용 토큰이 잘못됨"
 
+  uncheck:
+    success: "체크 해제된 항목: {items}"
+    invalid_index: "잘못된 인덱스: {index}"
+    already_unchecked: "항목 {index}은(는) 이미 체크 해제됨"
+
   set:
     success: "스테이지를 {stage}로 설정"
     invalid_stage: "잘못된 스테이지: {stage}"
@@ -165,6 +175,13 @@ controller:
     agent_registered: "ℹ️  '{agent}' 에이전트 리뷰가 등록되었습니다."
     no_tag_match: "ℹ️  태그 {tag}와 일치하는 미완료 항목이 없습니다."
     tag_found: "ℹ️  태그 {tag}와 일치하는 항목 {count}개 발견: [{items}]"
+
+  uncheck:
+    invalid_index: "잘못된 인덱스: {index}"
+    already_unchecked: "항목 {index}은(는) 이미 체크 해제됨"
+    token_required: "❌ 오류: [USER-APPROVE] 항목에 토큰이 필요합니다."
+    invalid_token: "❌ 오류: 잘못된 토큰: {text}"
+    unchecked: "체크 해제됨: {text}"
 
   next:
     force_token_required: "❌ 오류: --force는 USER-APPROVE 토큰이 필요합니다. 사용법: flow next --force --token YOUR_TOKEN --reason \"...\""

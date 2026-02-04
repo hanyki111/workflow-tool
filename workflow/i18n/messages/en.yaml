@@ -31,6 +31,11 @@ help:
     skip_action: "Skip action execution (manual override)"
     agent: "Pre-register agent review before check (e.g., --agent plan-critic)"
 
+  uncheck:
+    description: "Unmark checklist items (reverse of check)"
+    indices: "Item indices (1-based)"
+    token: "Secret token for USER-APPROVE items"
+
   set:
     description: "Manually set current stage/module"
     stage: "Stage code (e.g., M1, P2)"
@@ -102,6 +107,11 @@ commands:
     requires_token: "Item {index} requires USER-APPROVE token"
     invalid_token: "Invalid token for USER-APPROVE"
 
+  uncheck:
+    success: "Unchecked items: {items}"
+    invalid_index: "Invalid index: {index}"
+    already_unchecked: "Item {index} already unchecked"
+
   set:
     success: "Set stage to {stage}"
     invalid_stage: "Invalid stage: {stage}"
@@ -165,6 +175,13 @@ controller:
     agent_registered: "ℹ️  Agent review from '{agent}' registered."
     no_tag_match: "ℹ️  No unchecked items found with tag: {tag}"
     tag_found: "ℹ️  Found {count} items with tag {tag}: [{items}]"
+
+  uncheck:
+    invalid_index: "Invalid index: {index}"
+    already_unchecked: "Item {index} is already unchecked"
+    token_required: "❌ Error: Token required for [USER-APPROVE] item."
+    invalid_token: "❌ Error: Invalid token for: {text}"
+    unchecked: "Unchecked: {text}"
 
   next:
     force_token_required: "❌ Error: --force requires USER-APPROVE token. Use: flow next --force --token YOUR_TOKEN --reason \"...\""

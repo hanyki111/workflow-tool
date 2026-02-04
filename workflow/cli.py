@@ -50,6 +50,7 @@ def main():
     # Status
     status_parser = subparsers.add_parser(
         "status",
+        aliases=["s"],
         help=t('help.status.description')
     )
     status_parser.add_argument(
@@ -79,7 +80,7 @@ def main():
         help=t('help.next.reason')
     )
     next_parser.add_argument(
-        "--token",
+        "--token", "-k",
         help=t('help.next.token')
     )
     next_parser.add_argument(
@@ -91,6 +92,7 @@ def main():
     # Check
     check_parser = subparsers.add_parser(
         "check",
+        aliases=["c"],
         help=t('help.check.description')
     )
     check_parser.add_argument(
@@ -104,7 +106,7 @@ def main():
         help=t('help.check.tag')
     )
     check_parser.add_argument(
-        "--token",
+        "--token", "-k",
         help=t('help.check.token')
     )
     check_parser.add_argument(
@@ -123,6 +125,23 @@ def main():
     check_parser.add_argument(
         "--agent",
         help=t('help.check.agent')
+    )
+
+    # Uncheck
+    uncheck_parser = subparsers.add_parser(
+        "uncheck",
+        aliases=["u"],
+        help=t('help.uncheck.description')
+    )
+    uncheck_parser.add_argument(
+        "indices",
+        type=int,
+        nargs="+",
+        help=t('help.uncheck.indices')
+    )
+    uncheck_parser.add_argument(
+        "--token", "-k",
+        help=t('help.uncheck.token')
     )
 
     # Set
@@ -144,7 +163,7 @@ def main():
         help=t('help.set.force')
     )
     set_parser.add_argument(
-        "--token",
+        "--token", "-k",
         help=t('help.set.token')
     )
 
@@ -326,11 +345,11 @@ def main():
     try:
         ctrl = WorkflowController(config_path="workflow.yaml")
 
-        if args.command == "status":
+        if args.command in ("status", "s"):
             print(ctrl.status())
         elif args.command == "next":
             print(ctrl.next_stage(args.target, force=args.force, reason=args.reason, token=args.token, skip_conditions=args.skip_conditions))
-        elif args.command == "check":
+        elif args.command in ("check", "c"):
             if args.tag:
                 # Tag-based check (for shell wrapper automation)
                 print(ctrl.check_by_tag(args.tag, evidence=args.evidence))
@@ -339,6 +358,8 @@ def main():
                 print(ctrl.check(args.indices, token=args.token, evidence=args.evidence, args=args.args, skip_action=args.skip_action, agent=getattr(args, 'agent', None)))
             else:
                 print(t('cli.check_error'))
+        elif args.command in ("uncheck", "u"):
+            print(ctrl.uncheck(args.indices, token=args.token))
         elif args.command == "set":
             print(ctrl.set_stage(args.stage, module=args.module, force=args.force, token=args.token))
         elif args.command == "review":

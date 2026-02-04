@@ -207,6 +207,47 @@ class WorkflowController:
         # and potential timeout issues. The status will be updated on next status call.
         return "\n".join(results)
 
+    def uncheck(self, indices: List[int], token: Optional[str] = None) -> str:
+        """Unmark checklist items (reverse of check)."""
+        results = []
+
+        for index in indices:
+            if index < 1 or index > len(self.state.checklist):
+                results.append(t('controller.uncheck.invalid_index', index=index))
+                continue
+
+            item = self.state.checklist[index - 1]
+
+            # Check if item is already unchecked
+            if not item.checked:
+                results.append(t('controller.uncheck.already_unchecked', index=index))
+                continue
+
+            # USER-APPROVE items require token to uncheck as well
+            if item.text.strip().startswith("[USER-APPROVE]"):
+                if not token:
+                    results.append(t('controller.uncheck.token_required'))
+                    continue
+                if not verify_token(token):
+                    results.append(t('controller.uncheck.invalid_token', text=item.text))
+                    continue
+
+            item.checked = False
+            item.evidence = None  # Clear evidence when unchecking
+
+            results.append(t('controller.uncheck.unchecked', text=item.text))
+
+            # Log uncheck event
+            self.audit.logger.log_event("MANUAL_UNCHECK", {
+                "milestone": self.state.current_milestone,
+                "phase": self.state.current_phase,
+                "stage": self.state.current_stage,
+                "item": item.text
+            })
+
+        self.state.save(self.config.state_file)
+        return "\n".join(results)
+
     def check_by_tag(self, tag: str, evidence: Optional[str] = None) -> str:
         """
         Find and check items matching a specific tag pattern.
