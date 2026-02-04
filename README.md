@@ -495,7 +495,7 @@ $ flow check 2
 Items with `ralph` configuration will automatically retry via Task subagent on action failure:
 
 ```yaml
-# workflow.yaml
+# workflow.yaml - Basic usage (exit code based)
 checklist:
   - text: "Pass tests"
     action: "pytest"
@@ -505,12 +505,32 @@ checklist:
       hint: "Analyze failing tests and fix the code"
 ```
 
+**Output-based success/failure detection (success_contains / fail_contains):**
+
+Useful when success/failure should be determined by output content, like agent review results:
+
+```yaml
+# workflow.yaml - Output pattern matching
+checklist:
+  - text: "Pass code review"
+    action: "cat .workflow/code_review.md"
+    ralph:
+      enabled: true
+      max_retries: 5
+      success_contains:           # Success if output contains any of these
+        - "**PASS**"
+        - "**CONDITIONAL PASS**"
+      fail_contains:              # Fail if output contains any of these (priority)
+        - "**FAIL**"
+      hint: "Run code-reviewer agent and fix FAIL issues"
+```
+
 ```bash
 $ flow check 1
 🔄 [RALPH MODE] Action failed (attempt 1/5)
 
-Goal: Make `pytest` succeed
-Error: FAILED test_auth.py::test_login - KeyError: 'token'
+Goal: Make `cat .workflow/code_review.md` succeed
+Error: Fail pattern found in output: "**FAIL**"
 
 📋 Instructions for Task subagent:
 1. Analyze the error and fix the code
@@ -635,6 +655,51 @@ flow secret-generate
 # Confirm secret phrase: ********
 # Secret hash saved to .workflow/secret
 ```
+
+### `flow install-wrappers`
+
+Generate shell wrappers that automatically update checklist when CLI commands are executed.
+
+```bash
+# Install wrappers for auto-detected shell
+flow install-wrappers
+
+# Specify shell
+flow install-wrappers --shell bash
+flow install-wrappers --shell powershell
+
+# Preview wrappers without installing
+flow install-wrappers --list
+
+# Dry run - show changes without applying
+flow install-wrappers --dry-run
+
+# Remove wrappers
+flow install-wrappers --uninstall
+```
+
+**Add tags to workflow.yaml:**
+
+```yaml
+stages:
+  P3:
+    checklist:
+      - "[CMD:pytest] Run tests"
+      - "[CMD:mypy] Type check"
+```
+
+**Generated wrapper (Bash/Zsh):**
+
+```bash
+pytest() {
+    command pytest "$@"
+    local result=$?
+    [ $result -eq 0 ] && flow check --tag "CMD:pytest" 2>/dev/null
+    return $result
+}
+```
+
+Once installed, running `pytest` will automatically update the checklist on success.
 
 ### `flow tutorial`
 

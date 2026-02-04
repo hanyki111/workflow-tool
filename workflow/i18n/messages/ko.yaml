@@ -175,6 +175,9 @@ controller:
     agent_registered: "ℹ️  '{agent}' 에이전트 리뷰가 등록되었습니다."
     no_tag_match: "ℹ️  태그 {tag}와 일치하는 미완료 항목이 없습니다."
     tag_found: "ℹ️  태그 {tag}와 일치하는 항목 {count}개 발견: [{items}]"
+    pattern_matched: "   ✓ 성공 패턴 매칭됨: \"{pattern}\""
+    fail_pattern_found: "출력에서 실패 패턴 발견: \"{pattern}\""
+    success_pattern_missing: "출력에서 성공 패턴을 찾을 수 없음"
 
   uncheck:
     invalid_index: "잘못된 인덱스: {index}"

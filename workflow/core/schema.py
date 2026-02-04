@@ -24,6 +24,8 @@ class RalphConfig:
     enabled: bool = False
     max_retries: int = 5
     hint: str = ""  # Additional hint for AI when retrying
+    success_contains: List[str] = field(default_factory=list)  # Output must contain one of these
+    fail_contains: List[str] = field(default_factory=list)  # If output contains any of these, fail (priority)
 
 @dataclass
 class ChecklistItemConfig:

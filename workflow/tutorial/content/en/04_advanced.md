@@ -456,7 +456,7 @@ stages:
 
 Automatically retry via Task subagent until success when action fails.
 
-### Configuration
+### Basic Configuration (exit code based)
 
 ```yaml
 # workflow.yaml
@@ -470,6 +470,30 @@ stages:
           max_retries: 5      # Maximum retry attempts
           hint: "Analyze failing tests and fix the code"
 ```
+
+### Output Pattern Matching (success_contains / fail_contains)
+
+Judge success/failure by output content, like agent review results:
+
+```yaml
+checklist:
+  - text: "Pass code review"
+    action: "cat .workflow/code_review.md"
+    ralph:
+      enabled: true
+      max_retries: 5
+      success_contains:           # Success if any of these found
+        - "**PASS**"
+        - "**CONDITIONAL PASS**"
+      fail_contains:              # Fail if any of these found (priority)
+        - "**FAIL**"
+      hint: "Run code-reviewer agent and fix FAIL issues"
+```
+
+**Judgment Logic:**
+1. Check `fail_contains` first (higher priority)
+2. Check `success_contains`
+3. Fall back to exit code if no patterns defined
 
 ### How It Works
 

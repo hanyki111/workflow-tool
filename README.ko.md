@@ -470,7 +470,7 @@ $ flow check 2
 `ralph` 설정이 있는 항목은 액션 실패 시 Task 서브에이전트를 통해 자동 재시도합니다:
 
 ```yaml
-# workflow.yaml
+# workflow.yaml - 기본 사용법 (exit code 기반)
 checklist:
   - text: "테스트 통과"
     action: "pytest"
@@ -480,12 +480,32 @@ checklist:
       hint: "실패한 테스트를 분석하고 코드를 수정하세요"
 ```
 
+**출력 내용 기반 성공/실패 판단 (success_contains / fail_contains):**
+
+에이전트 리뷰 결과처럼 출력 내용으로 성공/실패를 판단해야 할 때 유용합니다:
+
+```yaml
+# workflow.yaml - 출력 패턴 매칭
+checklist:
+  - text: "코드 리뷰 통과"
+    action: "cat .workflow/code_review.md"
+    ralph:
+      enabled: true
+      max_retries: 5
+      success_contains:           # 이 중 하나라도 있으면 성공
+        - "**PASS**"
+        - "**CONDITIONAL PASS**"
+      fail_contains:              # 이게 있으면 무조건 실패 (우선)
+        - "**FAIL**"
+      hint: "code-reviewer 에이전트를 실행하고 FAIL 이슈를 수정하세요"
+```
+
 ```bash
 $ flow check 1
 🔄 [RALPH MODE] 액션 실패 (시도 1/5)
 
-목표: `pytest` 성공시키기
-에러: FAILED test_auth.py::test_login - KeyError: 'token'
+목표: `cat .workflow/code_review.md` 성공시키기
+에러: Fail pattern found in output: "**FAIL**"
 
 📋 Task 서브에이전트 지침:
 1. 에러 분석 후 코드 수정
@@ -610,6 +630,51 @@ flow secret-generate
 # 비밀 문구 확인: ********
 # Secret hash saved to .workflow/secret
 ```
+
+### `flow install-wrappers`
+
+CLI 명령 실행 시 자동으로 체크리스트를 업데이트하는 쉘 래퍼를 생성합니다.
+
+```bash
+# 자동 감지된 쉘에 래퍼 설치
+flow install-wrappers
+
+# 특정 쉘 지정
+flow install-wrappers --shell bash
+flow install-wrappers --shell powershell
+
+# 생성될 래퍼 미리보기 (설치하지 않음)
+flow install-wrappers --list
+
+# 실제 변경 없이 미리보기
+flow install-wrappers --dry-run
+
+# 래퍼 제거
+flow install-wrappers --uninstall
+```
+
+**workflow.yaml에 태그 추가:**
+
+```yaml
+stages:
+  P3:
+    checklist:
+      - "[CMD:pytest] 테스트 실행"
+      - "[CMD:mypy] 타입 체크"
+```
+
+**생성되는 래퍼 (Bash/Zsh):**
+
+```bash
+pytest() {
+    command pytest "$@"
+    local result=$?
+    [ $result -eq 0 ] && flow check --tag "CMD:pytest" 2>/dev/null
+    return $result
+}
+```
+
+래퍼가 설치되면 `pytest`를 실행할 때마다 성공 시 자동으로 체크리스트가 업데이트됩니다.
 
 ### `flow tutorial`
 

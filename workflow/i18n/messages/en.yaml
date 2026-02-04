@@ -175,6 +175,9 @@ controller:
     agent_registered: "ℹ️  Agent review from '{agent}' registered."
     no_tag_match: "ℹ️  No unchecked items found with tag: {tag}"
     tag_found: "ℹ️  Found {count} items with tag {tag}: [{items}]"
+    pattern_matched: "   ✓ Success pattern matched: \"{pattern}\""
+    fail_pattern_found: "Fail pattern found in output: \"{pattern}\""
+    success_pattern_missing: "Success pattern not found in output"
 
   uncheck:
     invalid_index: "Invalid index: {index}"

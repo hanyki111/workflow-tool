@@ -456,7 +456,7 @@ stages:
 
 액션 실패 시 Task 서브에이전트를 통해 성공할 때까지 자동 재시도합니다.
 
-### 설정
+### 기본 설정 (exit code 기반)
 
 ```yaml
 # workflow.yaml
@@ -470,6 +470,30 @@ stages:
           max_retries: 5      # 최대 재시도 횟수
           hint: "실패한 테스트를 분석하고 코드를 수정하세요"
 ```
+
+### 출력 패턴 매칭 (success_contains / fail_contains)
+
+에이전트 리뷰 결과처럼 출력 내용으로 성공/실패를 판단:
+
+```yaml
+checklist:
+  - text: "코드 리뷰 통과"
+    action: "cat .workflow/code_review.md"
+    ralph:
+      enabled: true
+      max_retries: 5
+      success_contains:           # 이 중 하나라도 있으면 성공
+        - "**PASS**"
+        - "**CONDITIONAL PASS**"
+      fail_contains:              # 이게 있으면 무조건 실패 (우선)
+        - "**FAIL**"
+      hint: "code-reviewer 에이전트를 실행하고 FAIL 이슈를 수정하세요"
+```
+
+**판단 로직:**
+1. `fail_contains` 먼저 검사 (우선순위 높음)
+2. `success_contains` 검사
+3. 패턴 미설정 시 exit code로 판단
 
 ### 동작 방식
 

@@ -98,6 +98,49 @@ class WorkflowController:
             except Exception:
                 pass
 
+    def _check_output_patterns(self, output: str, ralph: RalphConfig) -> Dict[str, Any]:
+        """
+        Check output against success_contains and fail_contains patterns.
+
+        Returns:
+            dict with 'success' (bool), 'reason' (str), 'matched_pattern' (str or None)
+        """
+        if not output:
+            output = ""
+
+        # 1. Check fail_contains first (higher priority)
+        if ralph.fail_contains:
+            for pattern in ralph.fail_contains:
+                if pattern in output:
+                    return {
+                        'success': False,
+                        'reason': 'fail_pattern_matched',
+                        'matched_pattern': pattern
+                    }
+
+        # 2. Check success_contains
+        if ralph.success_contains:
+            for pattern in ralph.success_contains:
+                if pattern in output:
+                    return {
+                        'success': True,
+                        'reason': 'success_pattern_matched',
+                        'matched_pattern': pattern
+                    }
+            # If success_contains is defined but none matched, it's a failure
+            return {
+                'success': False,
+                'reason': 'success_pattern_not_found',
+                'matched_pattern': None
+            }
+
+        # 3. No patterns defined - use default (exit code based)
+        return {
+            'success': None,  # None means "use default logic"
+            'reason': 'no_patterns',
+            'matched_pattern': None
+        }
+
     def _generate_ralph_prompt(self, index: int, item_config: ChecklistItemConfig,
                                action_result: Dict[str, Any], attempt: int) -> str:
         """Generate prompt for Task subagent to retry."""
@@ -265,7 +308,29 @@ class WorkflowController:
             # 3. Execute Action (if defined and not skipped)
             if item_config and item_config.action and not skip_action:
                 action_result = self._execute_action(item_config, args)
-                if not action_result['success']:
+
+                # Check output patterns if ralph config has success_contains or fail_contains
+                action_success = action_result['success']
+                pattern_check_reason = None
+                if item_config.ralph and (item_config.ralph.success_contains or item_config.ralph.fail_contains):
+                    pattern_result = self._check_output_patterns(
+                        action_result.get('output', '') + action_result.get('error', ''),
+                        item_config.ralph
+                    )
+                    if pattern_result['success'] is not None:
+                        action_success = pattern_result['success']
+                        pattern_check_reason = pattern_result['reason']
+                        if pattern_result['matched_pattern']:
+                            action_result['matched_pattern'] = pattern_result['matched_pattern']
+
+                if not action_success:
+                    # Set error message based on pattern check result
+                    if pattern_check_reason == 'fail_pattern_matched':
+                        action_result['error'] = t('controller.check.fail_pattern_found',
+                                                   pattern=action_result.get('matched_pattern', ''))
+                    elif pattern_check_reason == 'success_pattern_not_found':
+                        action_result['error'] = t('controller.check.success_pattern_missing')
+
                     # Check if Ralph mode is enabled for this item
                     if item_config.ralph and item_config.ralph.enabled:
                         attempt = self._update_ralph_state(
@@ -291,7 +356,12 @@ class WorkflowController:
                             continue
 
                     # Normal failure handling (no Ralph mode)
-                    results.append(t('controller.check.action_failed', index=index, error=action_result['error']))
+                    error_msg = action_result.get('error', '')
+                    if pattern_check_reason == 'fail_pattern_matched':
+                        error_msg = t('controller.check.fail_pattern_found', pattern=action_result.get('matched_pattern', ''))
+                    elif pattern_check_reason == 'success_pattern_not_found':
+                        error_msg = t('controller.check.success_pattern_missing')
+                    results.append(t('controller.check.action_failed', index=index, error=error_msg))
                     # Show stdout if available (useful for test output, etc.)
                     if action_result.get('output'):
                         output_lines = action_result['output'].strip().split('\n')
@@ -311,6 +381,9 @@ class WorkflowController:
                 if item_config.ralph:
                     self._clear_ralph_state(index)
                 results.append(t('controller.check.action_executed', command=action_result['command']))
+                # Show pattern match info if applicable
+                if action_result.get('matched_pattern'):
+                    results.append(t('controller.check.pattern_matched', pattern=action_result['matched_pattern']))
                 if action_result.get('output'):
                     results.append(t('controller.check.action_output', output=action_result['output'][:200]))
             elif item_config and item_config.action and skip_action:

@@ -87,7 +87,9 @@ class ConfigParserV2:
                         ralph_config = RalphConfig(
                             enabled=ralph_data.get('enabled', True),  # Default to enabled if ralph section exists
                             max_retries=ralph_data.get('max_retries', 5),
-                            hint=ralph_data.get('hint', '')
+                            hint=ralph_data.get('hint', ''),
+                            success_contains=ralph_data.get('success_contains', []),
+                            fail_contains=ralph_data.get('fail_contains', [])
                         )
 
                     checklist.append(ChecklistItemConfig(
