@@ -543,6 +543,8 @@ class WorkflowController:
                 shell=True,
                 capture_output=True,
                 text=True,
+                encoding='utf-8',
+                errors='replace',
                 timeout=300,  # 5 minute timeout
                 env=env,      # Inherit environment variables
                 cwd=os.getcwd()  # Run from current directory
