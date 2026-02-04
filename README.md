@@ -490,6 +490,51 @@ $ flow check 2
 ❌ Action failed for item 2: Tests failed with 3 errors
 ```
 
+**Ralph Loop Mode (Auto-Retry):**
+
+Items with `ralph` configuration will automatically retry via Task subagent on action failure:
+
+```yaml
+# workflow.yaml
+checklist:
+  - text: "Pass tests"
+    action: "pytest"
+    ralph:
+      enabled: true
+      max_retries: 5
+      hint: "Analyze failing tests and fix the code"
+```
+
+```bash
+$ flow check 1
+🔄 [RALPH MODE] Action failed (attempt 1/5)
+
+Goal: Make `pytest` succeed
+Error: FAILED test_auth.py::test_login - KeyError: 'token'
+
+📋 Instructions for Task subagent:
+1. Analyze the error and fix the code
+2. Run flow check 1 again
+3. Repeat until success
+```
+
+When Claude runs a Task subagent, it will fix the code and run `flow check 1` again. This continues until success or max retries is reached.
+
+### `flow uncheck`
+
+Revert checked items to unchecked state:
+
+```bash
+# Uncheck items
+flow uncheck 1 2
+
+# Using alias
+flow u 1
+
+# Uncheck USER-APPROVE item (requires token)
+flow u 3 --token "your-secret"
+```
+
 ### `flow next`
 
 Transition to the next stage.

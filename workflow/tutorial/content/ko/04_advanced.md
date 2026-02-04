@@ -452,4 +452,67 @@ stages:
           - use_ruleset: all_checked
 ```
 
+## Ralph Loop 모드
+
+액션 실패 시 Task 서브에이전트를 통해 성공할 때까지 자동 재시도합니다.
+
+### 설정
+
+```yaml
+# workflow.yaml
+stages:
+  IMPL:
+    checklist:
+      - text: "테스트 통과"
+        action: "pytest"
+        ralph:
+          enabled: true       # Ralph 모드 활성화
+          max_retries: 5      # 최대 재시도 횟수
+          hint: "실패한 테스트를 분석하고 코드를 수정하세요"
+```
+
+### 동작 방식
+
+```
+flow check 1
+    │
+    ├─ 성공 → ✅ 체크 완료
+    │
+    └─ 실패 (ralph 활성화)
+           │
+           ▼
+    🔄 [RALPH MODE] 액션 실패 (시도 1/5)
+
+    목표: `pytest` 성공시키기
+    에러: FAILED test_auth.py::test_login
+
+    📋 Task 서브에이전트 지침:
+    1. 에러 분석 후 코드 수정
+    2. flow check 1 재실행
+    3. 성공할 때까지 반복
+           │
+           ▼
+    Claude가 Task 서브에이전트 실행
+           │
+           ▼
+    서브에이전트: 수정 → flow check 1 → (반복)
+```
+
+### 핵심 개념
+
+Ralph Loop는 Geoffrey Huntley가 제안한 AI 에이전트 자율 실행 기법입니다:
+
+| 특징 | 설명 |
+|------|------|
+| **파일 기반 상태** | 진행 상태를 `.workflow/ralph_state.json`에 저장 |
+| **신선한 컨텍스트** | 서브에이전트는 매번 새로운 컨텍스트로 시작 |
+| **자동 리셋** | 성공 시 또는 스테이지 변경 시 상태 초기화 |
+
+### 강제 체크 (Ralph 우회)
+
+```bash
+# 최대 재시도 초과 후 강제로 체크하려면:
+flow check 1 --skip-action
+```
+
 다음: 모범 사례와 팁!

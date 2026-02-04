@@ -465,6 +465,51 @@ $ flow check 2
 ❌ Action failed for item 2: 테스트 3개 실패
 ```
 
+**Ralph Loop 모드 (자동 재시도):**
+
+`ralph` 설정이 있는 항목은 액션 실패 시 Task 서브에이전트를 통해 자동 재시도합니다:
+
+```yaml
+# workflow.yaml
+checklist:
+  - text: "테스트 통과"
+    action: "pytest"
+    ralph:
+      enabled: true
+      max_retries: 5
+      hint: "실패한 테스트를 분석하고 코드를 수정하세요"
+```
+
+```bash
+$ flow check 1
+🔄 [RALPH MODE] 액션 실패 (시도 1/5)
+
+목표: `pytest` 성공시키기
+에러: FAILED test_auth.py::test_login - KeyError: 'token'
+
+📋 Task 서브에이전트 지침:
+1. 에러 분석 후 코드 수정
+2. flow check 1 재실행
+3. 성공할 때까지 반복
+```
+
+Claude가 Task 서브에이전트를 실행하면, 서브에이전트가 코드를 수정하고 다시 `flow check 1`을 실행합니다. 성공하거나 최대 재시도 횟수에 도달할 때까지 반복됩니다.
+
+### `flow uncheck`
+
+체크된 항목을 미완료 상태로 되돌립니다:
+
+```bash
+# 항목 언체크
+flow uncheck 1 2
+
+# 축약어 사용
+flow u 1
+
+# USER-APPROVE 항목 언체크 (토큰 필요)
+flow u 3 --token "your-secret"
+```
+
 ### `flow next`
 
 다음 스테이지로 전이.

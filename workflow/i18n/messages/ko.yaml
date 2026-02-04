@@ -22,13 +22,13 @@ help:
     skip_conditions: "플러그인 조건(shell, fs) 건너뛰기 (all_checked는 여전히 필요)"
 
   check:
-    description: "체크리스트 항목 완료 표시"
+    description: "체크리스트 항목 완료 표시 (Ralph Loop 자동 재시도 지원)"
     indices: "항목 인덱스 (1부터 시작)"
     tag: "태그로 항목 체크 (예: CMD:pytest) - 쉘 래퍼 자동화용"
     token: "USER-APPROVE 항목용 비밀 토큰"
     evidence: "감사 증거 또는 근거 추가"
     args: "액션 명령어용 인자 (예: 커밋 메시지)"
-    skip_action: "액션 실행 건너뛰기 (수동 오버라이드)"
+    skip_action: "액션 실행 건너뛰기 (수동 오버라이드, Ralph 모드도 우회)"
     agent: "체크 전 에이전트 리뷰 사전 등록 (예: --agent plan-critic)"
 
   uncheck:

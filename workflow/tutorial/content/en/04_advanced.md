@@ -452,4 +452,67 @@ stages:
           - use_ruleset: all_checked
 ```
 
+## Ralph Loop Mode
+
+Automatically retry via Task subagent until success when action fails.
+
+### Configuration
+
+```yaml
+# workflow.yaml
+stages:
+  IMPL:
+    checklist:
+      - text: "Pass tests"
+        action: "pytest"
+        ralph:
+          enabled: true       # Enable Ralph mode
+          max_retries: 5      # Maximum retry attempts
+          hint: "Analyze failing tests and fix the code"
+```
+
+### How It Works
+
+```
+flow check 1
+    │
+    ├─ Success → ✅ Item checked
+    │
+    └─ Failure (ralph enabled)
+           │
+           ▼
+    🔄 [RALPH MODE] Action failed (attempt 1/5)
+
+    Goal: Make `pytest` succeed
+    Error: FAILED test_auth.py::test_login
+
+    📋 Instructions for Task subagent:
+    1. Analyze error and fix code
+    2. Run flow check 1 again
+    3. Repeat until success
+           │
+           ▼
+    Claude runs Task subagent
+           │
+           ▼
+    Subagent: fix → flow check 1 → (repeat)
+```
+
+### Key Concepts
+
+Ralph Loop is an autonomous AI agent execution technique proposed by Geoffrey Huntley:
+
+| Feature | Description |
+|---------|-------------|
+| **File-based state** | Progress stored in `.workflow/ralph_state.json` |
+| **Fresh context** | Subagent starts with new context each time |
+| **Auto-reset** | State cleared on success or stage change |
+
+### Force Check (Bypass Ralph)
+
+```bash
+# To force check after max retries exceeded:
+flow check 1 --skip-action
+```
+
 Next: Best practices and tips!
