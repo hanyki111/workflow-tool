@@ -50,6 +50,26 @@ help:
         --skip-action으로 Ralph 모드를 우회할 수 있습니다.
         자세한 내용: 'flow tutorial --section 4'
 
+      크로스 플랫폼 기능:
+        file_check: 쉘 명령어 없이 선언적 파일 내용 검사.
+        플랫폼 액션: 'unix', 'windows', 'all' 키로 플랫폼별 명령어 지정.
+
+        예시 (file_check):
+          checklist:
+            - text: "리뷰 통과"
+              file_check:
+                path: ".workflow/reviews/critic.md"
+                success_contains: ["APPROVED"]
+                fail_if_missing: true
+
+        예시 (플랫폼 액션):
+          checklist:
+            - text: "빌드"
+              action:
+                unix: "make build"
+                windows: "msbuild project.sln"
+                all: "python build.py"  # 선택: 모든 플랫폼 공통
+
   uncheck:
     description: "체크리스트 항목 완료 해제 (check의 반대)"
     indices: "항목 인덱스 (1부터 시작)"
@@ -197,6 +217,9 @@ controller:
     pattern_matched: "   ✓ 성공 패턴 매칭됨: \"{pattern}\""
     fail_pattern_found: "출력에서 실패 패턴 발견: \"{pattern}\""
     success_pattern_missing: "출력에서 성공 패턴을 찾을 수 없음"
+    file_check_failed: "❌ 항목 {index} 파일 검사 실패: {error}"
+    file_check_executed: "✅ 파일 검사 통과: {path}"
+    file_check_skipped: "⚠️ 항목 {index} 파일 검사 건너뜀: {path}"
 
   uncheck:
     invalid_index: "잘못된 인덱스: {index}"
@@ -241,6 +264,16 @@ controller:
   action:
     args_required: "이 액션에는 --args가 필요합니다. 사용법: flow check N --args \"your arguments\""
     timeout: "5분 후 액션 시간 초과"
+    no_platform_command: "플랫폼용 액션이 정의되지 않음: {platform}"
+    invalid_action_type: "잘못된 액션 설정"
+
+  file_check:
+    path_required: "오류: file_check에 경로가 필요합니다"
+    file_missing: "파일을 찾을 수 없음: {path}"
+    read_error: "파일 읽기 실패 {path}: {error}"
+    fail_pattern_found: "실패 패턴 발견: \"{pattern}\""
+    success_pattern_missing: "파일에서 성공 패턴을 찾을 수 없음"
+    checked: "파일 검사 통과: {path}"
 
   ralph:
     header: "🔄 [RALPH MODE] 액션 실패 (시도 {attempt}/{max_retries})"
@@ -252,6 +285,9 @@ controller:
     instruction_1: "1. 위 에러를 분석하고 코드를 수정하세요"
     instruction_2: "2. 수정 후 `flow check {index}`를 다시 실행하세요"
     instruction_3: "3. 액션이 성공할 때까지 반복하세요"
+    file_check_goal: "목표: 파일 검사를 통과시키세요: `{path}`"
+    file_content_section: "파일 내용 (마지막 부분):"
+    file_check_instruction_1: "1. 에러를 분석하고 검사를 통과하도록 파일을 수정하세요"
     max_retries_exceeded: "❌ [RALPH MODE] 항목 {index}의 최대 재시도 횟수 초과 ({max_retries}회). --skip-action으로 강제 체크 가능."
     task_prompt: |
       RALPH MODE입니다. 액션을 성공시키는 것이 목표입니다.

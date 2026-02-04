@@ -1061,6 +1061,57 @@ flow check 2 --skip-action
 | Easy to skip          | Enforced execution             |
 | Manual audit          | Automatic audit trail          |
 
+### Cross-Platform Support
+
+The workflow tool supports cross-platform compatibility with two features:
+
+#### file_check: Declarative File Content Checking
+
+Check file contents without shell commands - works identically on Windows, Mac, and Linux:
+
+```yaml
+checklist:
+  - text: "Review passed"
+    file_check:
+      path: ".workflow/reviews/critic.md"
+      success_contains: ["APPROVED", "CONDITIONAL PASS"]
+      fail_contains: ["FAIL"]
+      fail_if_missing: true
+      encoding: "utf-8"  # Optional, default: utf-8
+    ralph:
+      enabled: true
+      max_retries: 3
+```
+
+**Options:**
+
+| Option | Description |
+|--------|-------------|
+| `path` | File path to check (supports variables like `${active_module}`) |
+| `success_contains` | Check passes if file contains any of these patterns |
+| `fail_contains` | Check fails if file contains any of these (priority over success_contains) |
+| `fail_if_missing` | Fail if file doesn't exist (default: false) |
+| `encoding` | File encoding (default: utf-8) |
+
+**Note:** `file_check` and `action` are mutually exclusive - use one or the other.
+
+#### Platform-Specific Actions
+
+Define different commands for different platforms:
+
+```yaml
+checklist:
+  - text: "Build project"
+    action:
+      unix: "make build"
+      windows: "msbuild project.sln"
+      all: "python build.py"  # Optional: same for all platforms
+```
+
+**Priority:** `all` > platform-specific (`windows` or `unix`)
+
+**Platform detection:** Uses `sys.platform == 'win32'` to detect Windows.
+
 ### Guide File Integration (Checklist Sync)
 
 Sync checklists from your existing project documentation (e.g., `CONTRIBUTING.md`, `WORKFLOW.md`, or any markdown file). The engine parses markdown checkboxes from headers matching the stage label.

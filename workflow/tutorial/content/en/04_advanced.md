@@ -539,4 +539,95 @@ Ralph Loop is an autonomous AI agent execution technique proposed by Geoffrey Hu
 flow check 1 --skip-action
 ```
 
+## Cross-Platform Support
+
+Two features for Windows/Unix compatibility without shell dependency issues.
+
+### file_check: Shell-Free File Checking
+
+Check file contents using pure Python - works identically on all platforms:
+
+```yaml
+checklist:
+  - text: "Review passed"
+    file_check:
+      path: ".workflow/reviews/critic.md"
+      success_contains: ["APPROVED", "CONDITIONAL PASS"]
+      fail_contains: ["FAIL"]
+      fail_if_missing: true
+    ralph:
+      enabled: true
+      max_retries: 3
+```
+
+**Options:**
+| Option | Description |
+|--------|-------------|
+| `path` | File path (supports `${variables}`) |
+| `success_contains` | Pass if any pattern found |
+| `fail_contains` | Fail if any pattern found (priority) |
+| `fail_if_missing` | Fail if file doesn't exist |
+| `encoding` | File encoding (default: utf-8) |
+
+**Use instead of:**
+```yaml
+# Don't do this (shell-dependent):
+action: "cat .workflow/reviews/critic.md | grep APPROVED"
+
+# Do this (cross-platform):
+file_check:
+  path: ".workflow/reviews/critic.md"
+  success_contains: ["APPROVED"]
+```
+
+**Note:** `file_check` and `action` are mutually exclusive.
+
+### Platform-Specific Actions
+
+When you need different commands per platform:
+
+```yaml
+checklist:
+  - text: "Build project"
+    action:
+      unix: "make build"
+      windows: "msbuild project.sln"
+      all: "python build.py"  # Optional: overrides both
+```
+
+**Priority:** `all` > platform-specific
+
+**Platform detection:** `sys.platform == 'win32'` for Windows
+
+**Example - Conditional build:**
+```yaml
+checklist:
+  - text: "Run linter"
+    action:
+      unix: "./scripts/lint.sh"
+      windows: "powershell scripts/lint.ps1"
+
+  - text: "Compile"
+    action:
+      all: "python -m build"  # Same for all platforms
+```
+
+### Ralph Integration
+
+Both features work with Ralph Loop:
+
+```yaml
+- text: "Verify deployment"
+  file_check:
+    path: ".workflow/deploy_status.txt"
+    success_contains: ["DEPLOYED"]
+    fail_if_missing: true
+  ralph:
+    enabled: true
+    max_retries: 5
+    hint: "Run deployment script and check status"
+```
+
+On failure, Ralph prompt shows file content for debugging.
+
 Next: Best practices and tips!

@@ -1216,6 +1216,57 @@ flow check 2 --skip-action
 | 건너뛰기 쉬움         | 강제 실행                    |
 | 수동 감사             | 자동 감사 추적               |
 
+### 크로스 플랫폼 지원
+
+워크플로우 도구는 두 가지 기능으로 크로스 플랫폼 호환성을 지원합니다:
+
+#### file_check: 선언적 파일 내용 검사
+
+쉘 명령어 없이 파일 내용을 검사합니다 - Windows, Mac, Linux에서 동일하게 작동:
+
+```yaml
+checklist:
+  - text: "리뷰 통과"
+    file_check:
+      path: ".workflow/reviews/critic.md"
+      success_contains: ["APPROVED", "CONDITIONAL PASS"]
+      fail_contains: ["FAIL"]
+      fail_if_missing: true
+      encoding: "utf-8"  # 선택사항, 기본값: utf-8
+    ralph:
+      enabled: true
+      max_retries: 3
+```
+
+**옵션:**
+
+| 옵션 | 설명 |
+|------|------|
+| `path` | 검사할 파일 경로 (`${active_module}` 같은 변수 지원) |
+| `success_contains` | 파일에 이 패턴 중 하나라도 있으면 통과 |
+| `fail_contains` | 파일에 이 패턴이 있으면 실패 (success_contains보다 우선) |
+| `fail_if_missing` | 파일이 없으면 실패 (기본값: false) |
+| `encoding` | 파일 인코딩 (기본값: utf-8) |
+
+**참고:** `file_check`와 `action`은 상호 배타적입니다 - 둘 중 하나만 사용하세요.
+
+#### 플랫폼별 액션
+
+플랫폼별로 다른 명령어를 정의합니다:
+
+```yaml
+checklist:
+  - text: "프로젝트 빌드"
+    action:
+      unix: "make build"
+      windows: "msbuild project.sln"
+      all: "python build.py"  # 선택: 모든 플랫폼 공통
+```
+
+**우선순위:** `all` > 플랫폼별 (`windows` 또는 `unix`)
+
+**플랫폼 감지:** `sys.platform == 'win32'`로 Windows를 감지합니다.
+
 ### 가이드 파일 통합 (체크리스트 동기화)
 
 기존 프로젝트 문서(예: `CONTRIBUTING.md`, `WORKFLOW.md` 등 마크다운 파일)에서 체크리스트를 동기화합니다. 엔진이 스테이지 라벨과 일치하는 헤더의 마크다운 체크박스를 파싱합니다.

@@ -539,4 +539,95 @@ Ralph Loop는 Geoffrey Huntley가 제안한 AI 에이전트 자율 실행 기법
 flow check 1 --skip-action
 ```
 
+## 크로스 플랫폼 지원
+
+Windows/Unix 호환성을 위한 두 가지 기능으로 쉘 의존성 문제를 해결합니다.
+
+### file_check: 쉘 없는 파일 검사
+
+순수 Python으로 파일 내용을 검사 - 모든 플랫폼에서 동일하게 작동:
+
+```yaml
+checklist:
+  - text: "리뷰 통과"
+    file_check:
+      path: ".workflow/reviews/critic.md"
+      success_contains: ["APPROVED", "CONDITIONAL PASS"]
+      fail_contains: ["FAIL"]
+      fail_if_missing: true
+    ralph:
+      enabled: true
+      max_retries: 3
+```
+
+**옵션:**
+| 옵션 | 설명 |
+|------|------|
+| `path` | 파일 경로 (`${변수}` 지원) |
+| `success_contains` | 패턴 중 하나라도 있으면 통과 |
+| `fail_contains` | 패턴이 있으면 실패 (우선) |
+| `fail_if_missing` | 파일이 없으면 실패 |
+| `encoding` | 파일 인코딩 (기본값: utf-8) |
+
+**이렇게 하는 대신:**
+```yaml
+# 이렇게 하지 마세요 (쉘 의존):
+action: "cat .workflow/reviews/critic.md | grep APPROVED"
+
+# 이렇게 하세요 (크로스 플랫폼):
+file_check:
+  path: ".workflow/reviews/critic.md"
+  success_contains: ["APPROVED"]
+```
+
+**참고:** `file_check`와 `action`은 상호 배타적입니다.
+
+### 플랫폼별 액션
+
+플랫폼마다 다른 명령어가 필요한 경우:
+
+```yaml
+checklist:
+  - text: "프로젝트 빌드"
+    action:
+      unix: "make build"
+      windows: "msbuild project.sln"
+      all: "python build.py"  # 선택: 모두 덮어씀
+```
+
+**우선순위:** `all` > 플랫폼별
+
+**플랫폼 감지:** Windows는 `sys.platform == 'win32'`
+
+**예시 - 조건부 빌드:**
+```yaml
+checklist:
+  - text: "린터 실행"
+    action:
+      unix: "./scripts/lint.sh"
+      windows: "powershell scripts/lint.ps1"
+
+  - text: "컴파일"
+    action:
+      all: "python -m build"  # 모든 플랫폼 동일
+```
+
+### Ralph 통합
+
+두 기능 모두 Ralph Loop와 함께 작동합니다:
+
+```yaml
+- text: "배포 확인"
+  file_check:
+    path: ".workflow/deploy_status.txt"
+    success_contains: ["DEPLOYED"]
+    fail_if_missing: true
+  ralph:
+    enabled: true
+    max_retries: 5
+    hint: "배포 스크립트를 실행하고 상태를 확인하세요"
+```
+
+실패 시 Ralph 프롬프트에 디버깅을 위한 파일 내용이 표시됩니다.
+
 다음: 모범 사례와 팁!

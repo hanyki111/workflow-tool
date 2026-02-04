@@ -28,10 +28,34 @@ class RalphConfig:
     fail_contains: List[str] = field(default_factory=list)  # If output contains any of these, fail (priority)
 
 @dataclass
+class FileCheckConfig:
+    """Configuration for declarative file content checking (platform-independent)."""
+    path: str = ""
+    success_contains: List[str] = field(default_factory=list)
+    fail_contains: List[str] = field(default_factory=list)
+    fail_if_missing: bool = False
+    encoding: str = "utf-8"
+
+@dataclass
+class PlatformActionConfig:
+    """Platform-specific action commands."""
+    unix: Optional[str] = None
+    windows: Optional[str] = None
+    all: Optional[str] = None
+
+    def get_command(self) -> Optional[str]:
+        """Get command for current platform. Priority: all > platform-specific."""
+        import sys
+        if self.all:
+            return self.all
+        return self.windows if sys.platform == 'win32' else self.unix
+
+@dataclass
 class ChecklistItemConfig:
     """Checklist item with optional action."""
     text: str
-    action: Optional[str] = None      # Shell command to execute
+    action: Optional[Any] = None      # str or PlatformActionConfig
+    file_check: Optional[FileCheckConfig] = None  # Declarative file content checking
     require_args: bool = False        # Whether action needs --args
     confirm: bool = False             # Ask for confirmation before action
     allowed_exit_codes: List[int] = field(default_factory=lambda: [0])  # Exit codes considered success

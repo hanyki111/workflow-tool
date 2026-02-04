@@ -2,7 +2,7 @@ import re
 import yaml
 from typing import List, Optional, Dict, Any
 from .state import CheckItem
-from .schema import WorkflowConfigV2, StageConfig, TransitionConfig, ConditionConfig, ChecklistItemConfig, RalphConfig
+from .schema import WorkflowConfigV2, StageConfig, TransitionConfig, ConditionConfig, ChecklistItemConfig, RalphConfig, FileCheckConfig, PlatformActionConfig
 
 class GuideParser:
     def __init__(self, content: str):
@@ -92,9 +92,35 @@ class ConfigParserV2:
                             fail_contains=ralph_data.get('fail_contains', [])
                         )
 
+                    # Parse file_check config if present
+                    file_check_config = None
+                    file_check_data = item.get('file_check')
+                    if file_check_data:
+                        file_check_config = FileCheckConfig(
+                            path=file_check_data.get('path', ''),
+                            success_contains=file_check_data.get('success_contains', []),
+                            fail_contains=file_check_data.get('fail_contains', []),
+                            fail_if_missing=file_check_data.get('fail_if_missing', False),
+                            encoding=file_check_data.get('encoding', 'utf-8')
+                        )
+
+                    # Parse action (string or platform dict)
+                    action_data = item.get('action')
+                    action_config = None
+                    if action_data:
+                        if isinstance(action_data, str):
+                            action_config = action_data
+                        elif isinstance(action_data, dict):
+                            action_config = PlatformActionConfig(
+                                unix=action_data.get('unix'),
+                                windows=action_data.get('windows'),
+                                all=action_data.get('all')
+                            )
+
                     checklist.append(ChecklistItemConfig(
                         text=item.get('text', ''),
-                        action=item.get('action'),
+                        action=action_config,
+                        file_check=file_check_config,
                         require_args=item.get('require_args', False),
                         confirm=item.get('confirm', False),
                         allowed_exit_codes=item.get('allowed_exit_codes', [0]),

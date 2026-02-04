@@ -5,7 +5,7 @@ import json
 import subprocess
 from datetime import datetime
 from .state import WorkflowState, CheckItem
-from .schema import WorkflowConfigV2, ChecklistItemConfig, RalphConfig
+from .schema import WorkflowConfigV2, ChecklistItemConfig, RalphConfig, FileCheckConfig, PlatformActionConfig
 from .parser import GuideParser, ConfigParserV2
 from .engine import WorkflowEngine
 from .validator import ValidatorRegistry
@@ -186,6 +186,52 @@ class WorkflowController:
 
         return "\n".join(prompt_lines)
 
+    def _generate_file_check_ralph_prompt(self, index: int, item_config: ChecklistItemConfig,
+                                          file_check_result: Dict[str, Any], attempt: int) -> str:
+        """Generate prompt for Task subagent to retry file_check."""
+        ralph = item_config.ralph
+        max_retries = ralph.max_retries if ralph else 5
+        hint = ralph.hint if ralph and ralph.hint else ""
+        fc = item_config.file_check
+
+        prompt_lines = [
+            t('controller.ralph.header', attempt=attempt, max_retries=max_retries),
+            "",
+            t('controller.ralph.file_check_goal', path=fc.path),
+            "",
+            t('controller.ralph.error_section'),
+            f"```",
+            file_check_result.get('error', 'Unknown error')[:500],
+            f"```",
+            "",
+        ]
+
+        if file_check_result.get('output'):
+            output_preview = file_check_result['output'][-1000:]  # Last 1000 chars
+            prompt_lines.extend([
+                t('controller.ralph.file_content_section'),
+                f"```",
+                output_preview,
+                f"```",
+                "",
+            ])
+
+        if hint:
+            prompt_lines.extend([
+                t('controller.ralph.hint_section'),
+                hint,
+                "",
+            ])
+
+        prompt_lines.extend([
+            t('controller.ralph.instruction'),
+            t('controller.ralph.file_check_instruction_1'),
+            t('controller.ralph.instruction_2', index=index),
+            t('controller.ralph.instruction_3'),
+        ])
+
+        return "\n".join(prompt_lines)
+
     def status(self) -> str:
         if not self.state.current_stage:
             return t('controller.status.not_initialized')
@@ -305,7 +351,85 @@ class WorkflowController:
                     results.append(t('controller.check.agent_not_found', agent=required_agent))
                     continue
 
-            # 3. Execute Action (if defined and not skipped)
+            # 3. Execute file_check (if defined and not skipped)
+            if item_config and item_config.file_check and not skip_action:
+                file_check_result = self._execute_file_check(item_config)
+
+                # Check output patterns for Ralph mode if applicable
+                file_check_success = file_check_result['success']
+                pattern_check_reason = None
+                if item_config.ralph and (item_config.ralph.success_contains or item_config.ralph.fail_contains):
+                    pattern_result = self._check_output_patterns(
+                        file_check_result.get('output', ''),
+                        item_config.ralph
+                    )
+                    if pattern_result['success'] is not None:
+                        file_check_success = pattern_result['success']
+                        pattern_check_reason = pattern_result['reason']
+                        if pattern_result['matched_pattern']:
+                            file_check_result['matched_pattern'] = pattern_result['matched_pattern']
+
+                if not file_check_success:
+                    # Set error message based on pattern check result
+                    if pattern_check_reason == 'fail_pattern_matched':
+                        file_check_result['error'] = t('controller.check.fail_pattern_found',
+                                                       pattern=file_check_result.get('matched_pattern', ''))
+                    elif pattern_check_reason == 'success_pattern_not_found':
+                        file_check_result['error'] = t('controller.check.success_pattern_missing')
+
+                    # Check if Ralph mode is enabled for this item
+                    if item_config.ralph and item_config.ralph.enabled:
+                        attempt = self._update_ralph_state(
+                            index,
+                            file_check_result.get('error', ''),
+                            file_check_result.get('output', '')
+                        )
+                        max_retries = item_config.ralph.max_retries
+
+                        if attempt <= max_retries:
+                            # Generate Ralph mode prompt for file_check
+                            ralph_prompt = self._generate_file_check_ralph_prompt(
+                                index, item_config, file_check_result, attempt
+                            )
+                            results.append(ralph_prompt)
+                            self.state.save(self.config.state_file)
+                            return "\n".join(results)
+                        else:
+                            # Max retries exceeded
+                            results.append(t('controller.ralph.max_retries_exceeded',
+                                           index=index, max_retries=max_retries))
+                            self._clear_ralph_state(index)
+                            continue
+
+                    # Normal failure handling (no Ralph mode)
+                    error_msg = file_check_result.get('error', '')
+                    results.append(t('controller.check.file_check_failed', index=index, error=error_msg))
+                    # Show file content preview if available
+                    if file_check_result.get('output'):
+                        output_lines = file_check_result['output'].strip().split('\n')
+                        if len(output_lines) > 10:
+                            results.append(t('controller.check.action_output_header'))
+                            for line in output_lines[-10:]:
+                                results.append(t('controller.check.action_output_line', line=line))
+                        else:
+                            results.append(t('controller.check.action_output_short'))
+                            for line in output_lines:
+                                results.append(t('controller.check.action_output_line', line=line))
+                    results.append(t('controller.check.action_skip_hint'))
+                    continue
+
+                # file_check succeeded - clear ralph state if any
+                if item_config.ralph:
+                    self._clear_ralph_state(index)
+                results.append(t('controller.check.file_check_executed', path=item_config.file_check.path))
+                # Show pattern match info if applicable
+                if file_check_result.get('matched_pattern'):
+                    results.append(t('controller.check.pattern_matched', pattern=file_check_result['matched_pattern']))
+
+            elif item_config and item_config.file_check and skip_action:
+                results.append(t('controller.check.file_check_skipped', index=index, path=item_config.file_check.path))
+
+            # 4. Execute Action (if defined and not skipped)
             if item_config and item_config.action and not skip_action:
                 action_result = self._execute_action(item_config, args)
 
@@ -395,7 +519,7 @@ class WorkflowController:
 
             results.append(t('controller.check.checked', text=item.text))
 
-            # Log individual check with action info
+            # Log individual check with action/file_check info
             log_data = {
                 "milestone": self.state.current_milestone,
                 "phase": self.state.current_phase,
@@ -404,8 +528,14 @@ class WorkflowController:
                 "evidence": evidence
             }
             if item_config and item_config.action:
-                log_data["action_executed"] = item_config.action
+                # Log action (handle both string and PlatformActionConfig)
+                if isinstance(item_config.action, str):
+                    log_data["action_executed"] = item_config.action
+                elif isinstance(item_config.action, PlatformActionConfig):
+                    log_data["action_executed"] = item_config.action.get_command()
                 log_data["action_args"] = args
+            if item_config and item_config.file_check:
+                log_data["file_check_path"] = item_config.file_check.path
             self.audit.logger.log_event("MANUAL_CHECK", log_data)
 
         self.state.save(self.config.state_file)
@@ -507,6 +637,58 @@ class WorkflowController:
             return item
         return None
 
+    def _execute_file_check(self, item_config: ChecklistItemConfig) -> Dict[str, Any]:
+        """Execute file check (platform-independent)."""
+        fc = item_config.file_check
+        if not fc or not fc.path:
+            return {'success': False, 'error': t('controller.file_check.path_required')}
+
+        # Resolve path variables using ContextResolver
+        resolver = self.context.get_resolver()
+        path = resolver.resolve(fc.path)
+
+        # Check existence
+        if not os.path.exists(path):
+            if fc.fail_if_missing:
+                return {'success': False, 'error': t('controller.file_check.file_missing', path=path), 'output': ''}
+            return {'success': True, 'output': '', 'file_missing': True}
+
+        # Read file
+        try:
+            with open(path, 'r', encoding=fc.encoding, errors='replace') as f:
+                content = f.read()
+        except Exception as e:
+            return {'success': False, 'error': t('controller.file_check.read_error', path=path, error=str(e))}
+
+        # Check patterns (fail_contains first - higher priority)
+        if fc.fail_contains:
+            for pattern in fc.fail_contains:
+                if pattern in content:
+                    return {
+                        'success': False,
+                        'error': t('controller.file_check.fail_pattern_found', pattern=pattern),
+                        'output': content,
+                        'matched_pattern': pattern
+                    }
+
+        if fc.success_contains:
+            for pattern in fc.success_contains:
+                if pattern in content:
+                    return {
+                        'success': True,
+                        'output': content,
+                        'matched_pattern': pattern
+                    }
+            # If success_contains is defined but none matched, it's a failure
+            return {
+                'success': False,
+                'error': t('controller.file_check.success_pattern_missing'),
+                'output': content
+            }
+
+        # No patterns defined - just check file exists and is readable
+        return {'success': True, 'output': content}
+
     def _execute_action(self, item_config: ChecklistItemConfig, args: Optional[str] = None) -> Dict[str, Any]:
         """Execute the action command for a checklist item."""
         # Check if args are required but not provided
@@ -516,9 +698,22 @@ class WorkflowController:
                 'error': t('controller.action.args_required')
             }
 
-        # Substitute variables in action command using ContextResolver
-        # This supports nested variables (e.g., ${test_cmd} containing ${python})
-        command = item_config.action
+        # Resolve command from action type (string or PlatformActionConfig)
+        import sys
+        if isinstance(item_config.action, str):
+            command = item_config.action
+        elif isinstance(item_config.action, PlatformActionConfig):
+            command = item_config.action.get_command()
+            if not command:
+                return {
+                    'success': False,
+                    'error': t('controller.action.no_platform_command', platform=sys.platform)
+                }
+        else:
+            return {
+                'success': False,
+                'error': t('controller.action.invalid_action_type')
+            }
 
         # Add args to context temporarily for ${args} resolution
         # This ensures both {args} and ${args} syntax work

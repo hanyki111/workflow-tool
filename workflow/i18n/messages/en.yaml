@@ -50,6 +50,26 @@ help:
         Use --skip-action to bypass Ralph mode.
         See 'flow tutorial --section 4' for details.
 
+      Cross-Platform Features:
+        file_check: Declarative file content checking without shell commands.
+        Platform action: Use 'unix', 'windows', or 'all' keys for platform-specific commands.
+
+        Example (file_check):
+          checklist:
+            - text: "Review passed"
+              file_check:
+                path: ".workflow/reviews/critic.md"
+                success_contains: ["APPROVED"]
+                fail_if_missing: true
+
+        Example (platform action):
+          checklist:
+            - text: "Build"
+              action:
+                unix: "make build"
+                windows: "msbuild project.sln"
+                all: "python build.py"  # Optional: same for all
+
   uncheck:
     description: "Unmark checklist items (reverse of check)"
     indices: "Item indices (1-based)"
@@ -197,6 +217,9 @@ controller:
     pattern_matched: "   ✓ Success pattern matched: \"{pattern}\""
     fail_pattern_found: "Fail pattern found in output: \"{pattern}\""
     success_pattern_missing: "Success pattern not found in output"
+    file_check_failed: "❌ File check failed for item {index}: {error}"
+    file_check_executed: "✅ File check passed: {path}"
+    file_check_skipped: "⚠️ File check skipped for item {index}: {path}"
 
   uncheck:
     invalid_index: "Invalid index: {index}"
@@ -241,6 +264,16 @@ controller:
   action:
     args_required: "This action requires --args. Usage: flow check N --args \"your arguments\""
     timeout: "Action timed out after 5 minutes"
+    no_platform_command: "No action defined for platform: {platform}"
+    invalid_action_type: "Invalid action configuration"
+
+  file_check:
+    path_required: "Error: file_check requires a path"
+    file_missing: "File not found: {path}"
+    read_error: "Failed to read file {path}: {error}"
+    fail_pattern_found: "Fail pattern found: \"{pattern}\""
+    success_pattern_missing: "Success pattern not found in file"
+    checked: "File check passed: {path}"
 
   ralph:
     header: "🔄 [RALPH MODE] Action failed (attempt {attempt}/{max_retries})"
@@ -252,6 +285,9 @@ controller:
     instruction_1: "1. Analyze the error above and fix the code"
     instruction_2: "2. After fixing, run `flow check {index}` again"
     instruction_3: "3. Repeat until the action succeeds"
+    file_check_goal: "Goal: Make the file check pass for: `{path}`"
+    file_content_section: "File content (last part):"
+    file_check_instruction_1: "1. Analyze the error and modify the file to pass the check"
     max_retries_exceeded: "❌ [RALPH MODE] Max retries exceeded for item {index} ({max_retries} attempts). Use --skip-action to force check."
     task_prompt: |
       You are in RALPH MODE. Your goal is to make the action succeed.
