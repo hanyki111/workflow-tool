@@ -93,7 +93,9 @@ def main():
     check_parser = subparsers.add_parser(
         "check",
         aliases=["c"],
-        help=t('help.check.description')
+        help=t('help.check.description'),
+        epilog=t('help.check.epilog'),
+        formatter_class=argparse.RawDescriptionHelpFormatter
     )
     check_parser.add_argument(
         "indices",

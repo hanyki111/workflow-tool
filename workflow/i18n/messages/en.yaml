@@ -30,6 +30,25 @@ help:
     args: "Arguments for action command (e.g., commit message)"
     skip_action: "Skip action execution (manual override, also bypasses Ralph mode)"
     agent: "Pre-register agent review before check (e.g., --agent plan-critic)"
+    epilog: |
+
+      Ralph Loop Mode:
+        Items with 'ralph' config in workflow.yaml will auto-retry on failure.
+        Configure in workflow.yaml:
+
+          checklist:
+            - text: "Pass tests"
+              action: "pytest"
+              ralph:
+                enabled: true
+                max_retries: 5
+                success_contains: ["PASS"]    # Optional: check output
+                fail_contains: ["FAIL"]       # Optional: check output
+                hint: "Fix the failing tests"
+
+        On failure, outputs instructions for Task subagent to retry.
+        Use --skip-action to bypass Ralph mode.
+        See 'flow tutorial --section 4' for details.
 
   uncheck:
     description: "Unmark checklist items (reverse of check)"
