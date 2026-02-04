@@ -31,7 +31,8 @@ class WorkflowController:
         self.engine = WorkflowEngine(self.config, self.context)
         self.audit = WorkflowAuditManager(audit_dir=self.config.audit_dir)
         
-        if self.state.current_stage:
+        # Only set stage if it exists in config (skip special states like "IDLE", "")
+        if self.state.current_stage and self.state.current_stage in self.config.stages:
             self.engine.set_stage(self.state.current_stage)
             # Inject active_module from state into context
             self._update_context_from_state()
