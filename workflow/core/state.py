@@ -54,21 +54,22 @@ class CheckItem:
     require_args: bool = False    # Whether action requires --args
 
 @dataclass
-class WorkflowState:
-    current_milestone: str = ""
-    current_phase: str = ""
+class TrackState:
+    """Independent parallel track state."""
     current_stage: str = ""
     active_module: str = "unknown"
     checklist: List[CheckItem] = field(default_factory=list)
+    label: str = ""
+    status: str = "in_progress"  # "in_progress" | "complete"
+    created_at: str = ""
 
     def to_dict(self) -> Dict:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: Dict) -> 'WorkflowState':
+    def from_dict(cls, data: Dict) -> 'TrackState':
         items = []
         for item in data.get('checklist', []):
-            # Compatibility for older state files
             items.append(CheckItem(
                 text=item.get('text', ""),
                 checked=item.get('checked', False),
@@ -78,11 +79,52 @@ class WorkflowState:
                 require_args=item.get('require_args', False)
             ))
         return cls(
+            current_stage=data.get('current_stage', ""),
+            active_module=data.get('active_module', "unknown"),
+            checklist=items,
+            label=data.get('label', ""),
+            status=data.get('status', "in_progress"),
+            created_at=data.get('created_at', "")
+        )
+
+@dataclass
+class WorkflowState:
+    current_milestone: str = ""
+    current_phase: str = ""
+    current_stage: str = ""
+    active_module: str = "unknown"
+    checklist: List[CheckItem] = field(default_factory=list)
+    tracks: Dict[str, TrackState] = field(default_factory=dict)
+    active_track: Optional[str] = None
+
+    def to_dict(self) -> Dict:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: Dict) -> 'WorkflowState':
+        items = []
+        for item in data.get('checklist', []):
+            items.append(CheckItem(
+                text=item.get('text', ""),
+                checked=item.get('checked', False),
+                evidence=item.get('evidence', None),
+                required_agent=item.get('required_agent', None),
+                action=item.get('action', None),
+                require_args=item.get('require_args', False)
+            ))
+
+        tracks = {}
+        for tid, tdata in (data.get('tracks') or {}).items():
+            tracks[tid] = TrackState.from_dict(tdata)
+
+        return cls(
             current_milestone=data.get('current_milestone', ""),
             current_phase=data.get('current_phase', ""),
             current_stage=data.get('current_stage', ""),
             active_module=data.get('active_module', "unknown"),
-            checklist=items
+            checklist=items,
+            tracks=tracks,
+            active_track=data.get('active_track', None)
         )
 
     def save(self, path: str):
