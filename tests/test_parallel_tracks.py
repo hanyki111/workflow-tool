@@ -345,6 +345,18 @@ class TestTrackCreate:
         assert ctrl.state.tracks["A"].checklist == []
         assert "created" in result.lower() or "✅" in result
 
+    def test_create_default_stage(self):
+        """track_create without stage should default to first config stage."""
+        ctrl = _make_controller()
+        result = ctrl.track_create("A", label="Test", module="m")
+        assert ctrl.state.tracks["A"].current_stage == "P1"
+
+    def test_create_default_stage_with_none(self):
+        """track_create with stage=None should default to first config stage."""
+        ctrl = _make_controller()
+        result = ctrl.track_create("A", label="Test", module="m", stage=None)
+        assert ctrl.state.tracks["A"].current_stage == "P1"
+
     def test_create_duplicate_error(self):
         ctrl = _make_controller()
         ctrl.state.tracks["A"] = TrackState(label="existing")
@@ -670,3 +682,217 @@ class TestTrackScopedUncheck:
         ctrl = _make_controller()
         result = ctrl.uncheck([1], track="Z")
         assert "❌" in result
+
+
+# ─── Phase 2.3: CLI Interface + set_stage Track-Aware Tests ───
+
+
+class TestSetStageTrackScoped:
+    """set_stage() with track parameter tests."""
+
+    def test_set_stage_on_track(self):
+        """set_stage should change the track's stage, not global."""
+        ctrl = _make_controller()
+        ctrl.state.tracks["A"] = TrackState(
+            current_stage="P1",
+            active_module="viewer",
+            checklist=[]
+        )
+        result = ctrl.set_stage("P2", track="A")
+        assert ctrl.state.tracks["A"].current_stage == "P2"
+        assert ctrl.state.current_stage == "P4"  # Global unchanged
+
+    def test_set_stage_on_track_with_module(self):
+        """set_stage with module should update track's module."""
+        ctrl = _make_controller()
+        ctrl.state.tracks["A"] = TrackState(
+            current_stage="P1",
+            active_module="viewer",
+            checklist=[]
+        )
+        result = ctrl.set_stage("P2", module="new-mod", track="A")
+        assert ctrl.state.tracks["A"].active_module == "new-mod"
+        assert "new-mod" in result
+
+    def test_set_stage_track_clears_checklist(self):
+        """set_stage should clear track's checklist."""
+        ctrl = _make_controller()
+        ctrl.state.tracks["A"] = TrackState(
+            current_stage="P1",
+            checklist=[CheckItem(text="item", checked=True)]
+        )
+        result = ctrl.set_stage("P2", track="A")
+        assert ctrl.state.tracks["A"].checklist == []
+
+    def test_set_stage_nonexistent_track_error(self):
+        """set_stage on non-existent track should return error."""
+        ctrl = _make_controller()
+        result = ctrl.set_stage("P2", track="Z")
+        assert "❌" in result
+
+    def test_set_stage_track_with_unchecked_items_blocked(self):
+        """set_stage should block when track has unchecked items without --force."""
+        ctrl = _make_controller()
+        ctrl.state.tracks["A"] = TrackState(
+            current_stage="P1",
+            checklist=[CheckItem(text="unchecked item", checked=False)]
+        )
+        result = ctrl.set_stage("P2", track="A")
+        assert "unchecked" in result.lower() or "미완료" in result
+
+    def test_set_stage_track_force_with_token(self):
+        """set_stage --force on track with valid token should succeed."""
+        ctrl = _make_controller()
+        ctrl.state.tracks["A"] = TrackState(
+            current_stage="P1",
+            checklist=[CheckItem(text="unchecked", checked=False)]
+        )
+        with patch('workflow.core.controller.verify_token', return_value=True):
+            result = ctrl.set_stage("P2", force=True, token="VALID", track="A")
+        assert ctrl.state.tracks["A"].current_stage == "P2"
+
+    def test_set_stage_via_active_track(self):
+        """set_stage without explicit track should use active_track."""
+        ctrl = _make_controller()
+        ctrl.state.tracks["A"] = TrackState(current_stage="P1", checklist=[])
+        ctrl.state.active_track = "A"
+        result = ctrl.set_stage("P2")
+        assert ctrl.state.tracks["A"].current_stage == "P2"
+
+    def test_set_stage_invalid_stage(self):
+        """set_stage with invalid stage code should fail regardless of track."""
+        ctrl = _make_controller()
+        ctrl.state.tracks["A"] = TrackState(current_stage="P1", checklist=[])
+        result = ctrl.set_stage("INVALID", track="A")
+        assert "❌" in result
+
+
+class TestCLITrackArgParsing:
+    """Test that CLI argparse correctly parses track-related arguments."""
+
+    def _parse_args(self, args_list):
+        """Helper to parse args using the CLI's argument parser."""
+        import argparse
+        from workflow.i18n import t, set_language
+        set_language("en")
+
+        parser = argparse.ArgumentParser()
+        subparsers = parser.add_subparsers(dest="command")
+
+        # status
+        sp = subparsers.add_parser("status")
+        sp.add_argument("--track")
+        sp.add_argument("--all", action="store_true", dest="all_tracks")
+
+        # check
+        cp = subparsers.add_parser("check")
+        cp.add_argument("indices", type=int, nargs="*")
+        cp.add_argument("--track")
+
+        # next
+        np = subparsers.add_parser("next")
+        np.add_argument("target", nargs="?")
+        np.add_argument("--track")
+
+        # set
+        setp = subparsers.add_parser("set")
+        setp.add_argument("stage")
+        setp.add_argument("--track")
+
+        # uncheck
+        up = subparsers.add_parser("uncheck")
+        up.add_argument("indices", type=int, nargs="+")
+        up.add_argument("--track")
+
+        # track subcommand group
+        tp = subparsers.add_parser("track")
+        tsub = tp.add_subparsers(dest="track_command")
+        tc = tsub.add_parser("create")
+        tc.add_argument("id")
+        tc.add_argument("--label", required=True)
+        tc.add_argument("--module", required=True)
+        tc.add_argument("--stage")
+        tsub.add_parser("list")
+        ts = tsub.add_parser("switch")
+        ts.add_argument("id")
+        tj = tsub.add_parser("join")
+        tj.add_argument("--force", action="store_true")
+        tj.add_argument("--token", "-k")
+        td = tsub.add_parser("delete")
+        td.add_argument("id")
+
+        return parser.parse_args(args_list)
+
+    def test_status_track_option(self):
+        args = self._parse_args(["status", "--track", "A"])
+        assert args.command == "status"
+        assert args.track == "A"
+
+    def test_status_all_option(self):
+        args = self._parse_args(["status", "--all"])
+        assert args.command == "status"
+        assert args.all_tracks is True
+
+    def test_check_track_option(self):
+        args = self._parse_args(["check", "1", "2", "--track", "B"])
+        assert args.command == "check"
+        assert args.indices == [1, 2]
+        assert args.track == "B"
+
+    def test_next_track_option(self):
+        args = self._parse_args(["next", "--track", "A"])
+        assert args.command == "next"
+        assert args.track == "A"
+
+    def test_set_track_option(self):
+        args = self._parse_args(["set", "P2", "--track", "A"])
+        assert args.command == "set"
+        assert args.stage == "P2"
+        assert args.track == "A"
+
+    def test_uncheck_track_option(self):
+        args = self._parse_args(["uncheck", "1", "--track", "A"])
+        assert args.command == "uncheck"
+        assert args.track == "A"
+
+    def test_track_create(self):
+        args = self._parse_args(["track", "create", "A", "--label", "Test", "--module", "mod"])
+        assert args.command == "track"
+        assert args.track_command == "create"
+        assert args.id == "A"
+        assert args.label == "Test"
+        assert args.module == "mod"
+
+    def test_track_create_with_stage(self):
+        args = self._parse_args(["track", "create", "A", "--label", "Test", "--module", "mod", "--stage", "P2"])
+        assert args.stage == "P2"
+
+    def test_track_list(self):
+        args = self._parse_args(["track", "list"])
+        assert args.track_command == "list"
+
+    def test_track_switch(self):
+        args = self._parse_args(["track", "switch", "A"])
+        assert args.track_command == "switch"
+        assert args.id == "A"
+
+    def test_track_join(self):
+        args = self._parse_args(["track", "join"])
+        assert args.track_command == "join"
+        assert args.force is False
+
+    def test_track_join_force(self):
+        args = self._parse_args(["track", "join", "--force", "--token", "TOK"])
+        assert args.force is True
+        assert args.token == "TOK"
+
+    def test_track_delete(self):
+        args = self._parse_args(["track", "delete", "A"])
+        assert args.track_command == "delete"
+        assert args.id == "A"
+
+    def test_no_track_option_is_none(self):
+        """Without --track, track should be None."""
+        args = self._parse_args(["status"])
+        assert args.track is None
+        assert args.all_tracks is False

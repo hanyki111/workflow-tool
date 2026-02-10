@@ -117,6 +117,22 @@ help:
     force: "기존 파일 덮어쓰기"
     list_templates: "사용 가능한 템플릿 보기"
 
+  track:
+    description: "병렬 Track 관리 명령"
+    create: "새 병렬 Track 생성"
+    id: "Track 식별자 (영문, 숫자, 하이픈, 밑줄)"
+    label: "Track의 사용자 표시 라벨"
+    module: "Track에 할당할 모듈 이름"
+    stage: "시작 스테이지 코드 (기본: 첫 번째 스테이지)"
+    list: "모든 병렬 Track 목록"
+    switch: "현재 세션의 활성 Track 설정"
+    join: "완료된 모든 Track 합류 및 정리"
+    delete: "특정 Track 삭제"
+    force: "미완료 Track이 있어도 강제 합류 (--token 필요)"
+    token: "USER-APPROVE 토큰 (--force 사용 시 필수)"
+    track_option: "대상 Track ID (활성 Track보다 우선)"
+    all_option: "모든 Track 요약 표시"
+
   install_wrappers:
     description: "워크플로우 자동 통합을 위한 쉘 래퍼 생성"
     shell: "대상 쉘 (bash, zsh, powershell, fish, auto)"
@@ -327,6 +343,7 @@ controller:
 cli:
   check_error: "❌ 오류: 인덱스 또는 --tag가 필요합니다"
   module_usage: "사용법: flow module set <name>"
+  track_usage: "사용법: flow track <create|list|switch|join|delete>"
   alias:
     no_config: "쉘 설정 파일(.zshrc, .bashrc)을 찾을 수 없습니다."
     add_manually: "다음 줄을 수동으로 추가하세요:\n  {line}"

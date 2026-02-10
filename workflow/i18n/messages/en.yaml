@@ -117,6 +117,22 @@ help:
     force: "Overwrite existing files"
     list_templates: "Show available templates"
 
+  track:
+    description: "Parallel track management commands"
+    create: "Create a new parallel track"
+    id: "Track identifier (alphanumeric, hyphens, underscores)"
+    label: "Human-readable label for the track"
+    module: "Module name to assign to the track"
+    stage: "Starting stage code (default: first stage)"
+    list: "List all parallel tracks"
+    switch: "Set active track for current session"
+    join: "Join all completed tracks and clean up"
+    delete: "Delete a specific track"
+    force: "Force join even with incomplete tracks (requires --token)"
+    token: "USER-APPROVE token (required for --force)"
+    track_option: "Target track ID (overrides active track)"
+    all_option: "Show all tracks summary"
+
   install_wrappers:
     description: "Generate shell wrappers for automatic workflow integration"
     shell: "Target shell (bash, zsh, powershell, fish, auto)"
@@ -327,6 +343,7 @@ controller:
 cli:
   check_error: "❌ Error: Either indices or --tag is required"
   module_usage: "Usage: flow module set <name>"
+  track_usage: "Usage: flow track <create|list|switch|join|delete>"
   alias:
     no_config: "Could not find shell config file (.zshrc, .bashrc)."
     add_manually: "Please add this line manually:\n  {line}"

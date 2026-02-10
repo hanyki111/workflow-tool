@@ -1087,12 +1087,18 @@ class WorkflowController:
             if effective_track and self.state.current_stage in self.config.stages:
                 self.engine.set_stage(self.state.current_stage)
 
-    def set_stage(self, stage: str, module: Optional[str] = None, force: bool = False, token: Optional[str] = None) -> str:
+    def set_stage(self, stage: str, module: Optional[str] = None, force: bool = False, token: Optional[str] = None, track: Optional[str] = None) -> str:
         """Manually set the current stage. Requires --force if checklist has unchecked items."""
         # Validate stage exists
         if stage not in self.config.stages:
             valid_stages = list(self.config.stages.keys())
             return t('controller.set.invalid_stage', stage=stage, valid_stages=valid_stages)
+
+        # Resolve track
+        effective_track = self._resolve_track_id(track)
+        if effective_track and effective_track not in self.state.tracks:
+            return t('controller.track.not_found', id=effective_track)
+        effective = self._get_effective_state(track)
 
         # Always validate token when --force is used (security consistency)
         if force:
@@ -1102,7 +1108,7 @@ class WorkflowController:
                 return t('controller.set.force_invalid_token')
 
         # Check for unchecked items in current checklist
-        unchecked = [i for i in self.state.checklist if not i.checked]
+        unchecked = [i for i in effective.checklist if not i.checked]
         if unchecked and not force:
             unchecked_texts = [f"  - {i.text}" for i in unchecked[:5]]
             if len(unchecked) > 5:
@@ -1116,29 +1122,37 @@ class WorkflowController:
         # Record audit log if forcing with unchecked items
         if unchecked and force:
             self.audit.logger.log_event("FORCED_SET_STAGE", {
-                "from_stage": self.state.current_stage,
+                "from_stage": effective.current_stage,
                 "to_stage": stage,
                 "unchecked_count": len(unchecked),
-                "unchecked_items": [i.text for i in unchecked]
+                "unchecked_items": [i.text for i in unchecked],
+                "track": effective_track
             })
 
         # Perform the stage change
-        from_stage = self.state.current_stage
-        self.state.current_stage = stage
-        self.state.checklist = []  # Clear checklist for new stage
+        from_stage = effective.current_stage
+        effective.current_stage = stage
+        effective.checklist = []  # Clear checklist for new stage
         if module:
-            self.state.active_module = module
-            self.context.update("active_module", module)
+            effective.active_module = module
+            if not effective_track:
+                self.context.update("active_module", module)
         self.state.save(self.config.state_file)
-        self.engine.set_stage(stage)
 
-        if unchecked and force:
-            result = t('controller.set.success_forced', stage=stage)
-        else:
-            result = t('controller.set.success', stage=stage)
-        if module:
-            result += t('controller.set.success_module', module=module)
-        return result + "\n" + self.status()
+        try:
+            self.engine.set_stage(stage)
+
+            if unchecked and force:
+                result = t('controller.set.success_forced', stage=stage)
+            else:
+                result = t('controller.set.success', stage=stage)
+            if module:
+                result += t('controller.set.success_module', module=module)
+            return result + "\n" + self.status(track=effective_track)
+        finally:
+            # Restore engine to global stage if track was used
+            if effective_track and self.state.current_stage in self.config.stages:
+                self.engine.set_stage(self.state.current_stage)
 
     def set_module(self, module: str, track: Optional[str] = None) -> str:
         """Set active module without changing stage. Does not require --force."""
@@ -1152,7 +1166,8 @@ class WorkflowController:
 
         old_module = effective.active_module
         effective.active_module = module
-        self.context.update("active_module", module)
+        if not effective_track:
+            self.context.update("active_module", module)
         self.state.save(self.config.state_file)
 
         log_data = {
@@ -1189,8 +1204,11 @@ class WorkflowController:
 
     # ─── Track Management ───
 
-    def track_create(self, track_id: str, label: str, module: str, stage: str = "P1") -> str:
+    def track_create(self, track_id: str, label: str, module: str, stage: Optional[str] = None) -> str:
         """Create a new parallel track."""
+        # Default stage: first stage in config
+        if not stage:
+            stage = list(self.config.stages.keys())[0]
         # Validate track_id format
         if not re.match(r'^[A-Za-z0-9_-]+$', track_id):
             return t('controller.track.invalid_id', id=track_id)
