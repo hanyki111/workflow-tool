@@ -58,6 +58,16 @@ def main():
         action="store_true",
         help=t('help.status.oneline')
     )
+    status_parser.add_argument(
+        "--track",
+        help=t('help.track.track_option')
+    )
+    status_parser.add_argument(
+        "--all",
+        action="store_true",
+        dest="all_tracks",
+        help=t('help.track.all_option')
+    )
 
     # Next
     next_parser = subparsers.add_parser(
@@ -87,6 +97,10 @@ def main():
         "--skip-conditions",
         action="store_true",
         help=t('help.next.skip_conditions')
+    )
+    next_parser.add_argument(
+        "--track",
+        help=t('help.track.track_option')
     )
 
     # Check
@@ -128,6 +142,10 @@ def main():
         "--agent",
         help=t('help.check.agent')
     )
+    check_parser.add_argument(
+        "--track",
+        help=t('help.track.track_option')
+    )
 
     # Uncheck
     uncheck_parser = subparsers.add_parser(
@@ -144,6 +162,10 @@ def main():
     uncheck_parser.add_argument(
         "--token", "-k",
         help=t('help.uncheck.token')
+    )
+    uncheck_parser.add_argument(
+        "--track",
+        help=t('help.track.track_option')
     )
 
     # Set
@@ -167,6 +189,10 @@ def main():
     set_parser.add_argument(
         "--token", "-k",
         help=t('help.set.token')
+    )
+    set_parser.add_argument(
+        "--track",
+        help=t('help.track.track_option')
     )
 
     # Review
@@ -204,6 +230,82 @@ def main():
     module_set_parser.add_argument(
         "name",
         help=t('help.module.name')
+    )
+    module_set_parser.add_argument(
+        "--track",
+        help=t('help.track.track_option')
+    )
+
+    # Track (subcommand group)
+    track_parser = subparsers.add_parser(
+        "track",
+        help=t('help.track.description')
+    )
+    track_subparsers = track_parser.add_subparsers(dest="track_command")
+
+    # track create
+    track_create_parser = track_subparsers.add_parser(
+        "create",
+        help=t('help.track.create')
+    )
+    track_create_parser.add_argument(
+        "id",
+        help=t('help.track.id')
+    )
+    track_create_parser.add_argument(
+        "--label",
+        required=True,
+        help=t('help.track.label')
+    )
+    track_create_parser.add_argument(
+        "--module",
+        required=True,
+        help=t('help.track.module')
+    )
+    track_create_parser.add_argument(
+        "--stage",
+        help=t('help.track.stage')
+    )
+
+    # track list
+    track_subparsers.add_parser(
+        "list",
+        help=t('help.track.list')
+    )
+
+    # track switch
+    track_switch_parser = track_subparsers.add_parser(
+        "switch",
+        help=t('help.track.switch')
+    )
+    track_switch_parser.add_argument(
+        "id",
+        help=t('help.track.id')
+    )
+
+    # track join
+    track_join_parser = track_subparsers.add_parser(
+        "join",
+        help=t('help.track.join')
+    )
+    track_join_parser.add_argument(
+        "--force",
+        action="store_true",
+        help=t('help.track.force')
+    )
+    track_join_parser.add_argument(
+        "--token", "-k",
+        help=t('help.track.token')
+    )
+
+    # track delete
+    track_delete_parser = track_subparsers.add_parser(
+        "delete",
+        help=t('help.track.delete')
+    )
+    track_delete_parser.add_argument(
+        "id",
+        help=t('help.track.id')
     )
 
     # Alias Install
@@ -348,22 +450,22 @@ def main():
         ctrl = WorkflowController(config_path="workflow.yaml")
 
         if args.command in ("status", "s"):
-            print(ctrl.status())
+            print(ctrl.status(track=args.track, all_tracks=args.all_tracks))
         elif args.command == "next":
-            print(ctrl.next_stage(args.target, force=args.force, reason=args.reason, token=args.token, skip_conditions=args.skip_conditions))
+            print(ctrl.next_stage(args.target, force=args.force, reason=args.reason, token=args.token, skip_conditions=args.skip_conditions, track=args.track))
         elif args.command in ("check", "c"):
             if args.tag:
                 # Tag-based check (for shell wrapper automation)
-                print(ctrl.check_by_tag(args.tag, evidence=args.evidence))
+                print(ctrl.check_by_tag(args.tag, evidence=args.evidence, track=args.track))
             elif args.indices:
                 # Index-based check
-                print(ctrl.check(args.indices, token=args.token, evidence=args.evidence, args=args.args, skip_action=args.skip_action, agent=getattr(args, 'agent', None)))
+                print(ctrl.check(args.indices, token=args.token, evidence=args.evidence, args=args.args, skip_action=args.skip_action, agent=getattr(args, 'agent', None), track=args.track))
             else:
                 print(t('cli.check_error'))
         elif args.command in ("uncheck", "u"):
-            print(ctrl.uncheck(args.indices, token=args.token))
+            print(ctrl.uncheck(args.indices, token=args.token, track=args.track))
         elif args.command == "set":
-            print(ctrl.set_stage(args.stage, module=args.module, force=args.force, token=args.token))
+            print(ctrl.set_stage(args.stage, module=args.module, force=args.force, token=args.token, track=args.track))
         elif args.command == "review":
             print(ctrl.record_review(args.agent, args.summary))
         elif args.command == "secret-generate":
@@ -372,9 +474,22 @@ def main():
             install_alias(args.name)
         elif args.command == "module":
             if args.module_command == "set":
-                print(ctrl.set_module(args.name))
+                print(ctrl.set_module(args.name, track=getattr(args, 'track', None)))
             else:
                 print(t('cli.module_usage'))
+        elif args.command == "track":
+            if args.track_command == "create":
+                print(ctrl.track_create(args.id, label=args.label, module=args.module, stage=args.stage))
+            elif args.track_command == "list":
+                print(ctrl.track_list())
+            elif args.track_command == "switch":
+                print(ctrl.track_switch(args.id))
+            elif args.track_command == "join":
+                print(ctrl.track_join(force=args.force, token=args.token))
+            elif args.track_command == "delete":
+                print(ctrl.track_delete(args.id))
+            else:
+                print(t('cli.track_usage'))
         else:
             parser.print_help()
 

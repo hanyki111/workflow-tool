@@ -117,6 +117,22 @@ help:
     force: "Overwrite existing files"
     list_templates: "Show available templates"
 
+  track:
+    description: "Parallel track management commands"
+    create: "Create a new parallel track"
+    id: "Track identifier (alphanumeric, hyphens, underscores)"
+    label: "Human-readable label for the track"
+    module: "Module name to assign to the track"
+    stage: "Starting stage code (default: first stage)"
+    list: "List all parallel tracks"
+    switch: "Set active track for current session"
+    join: "Join all completed tracks and clean up"
+    delete: "Delete a specific track"
+    force: "Force join even with incomplete tracks (requires --token)"
+    token: "USER-APPROVE token (required for --force)"
+    track_option: "Target track ID (overrides active track)"
+    all_option: "Show all tracks summary"
+
   install_wrappers:
     description: "Generate shell wrappers for automatic workflow integration"
     shell: "Target shell (bash, zsh, powershell, fish, auto)"
@@ -258,6 +274,25 @@ controller:
     name_required: "❌ Error: Module name is required."
     changed: "✅ Module changed: {old} → {new}"
 
+  track:
+    invalid_id: "❌ Error: Invalid track ID '{id}'. Use alphanumeric characters, hyphens, or underscores only."
+    duplicate_id: "❌ Error: Track '{id}' already exists."
+    invalid_stage: "❌ Error: Invalid stage '{stage}'. Valid stages: {valid_stages}"
+    created: "✅ Track '{id}' created (label: {label}, stage: {stage})"
+    no_tracks: "No parallel tracks defined."
+    list_header: "Parallel Tracks: {count}"
+    active_track: "Active track: {id}"
+    not_found: "❌ Error: Track '{id}' not found."
+    switched: "✅ Active track set to '{id}'"
+    join_incomplete: "❌ Cannot join: incomplete tracks remain:"
+    join_force_hint: "Use --force --token YOUR_TOKEN to join anyway."
+    join_token_required: "❌ Error: --force requires USER-APPROVE token."
+    join_invalid_token: "❌ Error: Invalid token for forced join."
+    joined: "✅ All tracks joined and cleared: {tracks}"
+    deleted: "✅ Track '{id}' deleted."
+    completed: "✅ Track '{id}' completed (no more transitions available)."
+    active_warning: "⚠ {count} parallel track(s) active. Use `flow status --all` for details."
+
   review:
     recorded: "✅ Recorded review from agent '{agent}' for stage {stage}."
 
@@ -308,6 +343,7 @@ controller:
 cli:
   check_error: "❌ Error: Either indices or --tag is required"
   module_usage: "Usage: flow module set <name>"
+  track_usage: "Usage: flow track <create|list|switch|join|delete>"
   alias:
     no_config: "Could not find shell config file (.zshrc, .bashrc)."
     add_manually: "Please add this line manually:\n  {line}"

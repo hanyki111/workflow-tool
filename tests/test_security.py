@@ -63,6 +63,8 @@ class TestSetStageTokenValidation:
             state.current_stage = "S1"
             state.active_module = "test-module"
             state.checklist = []  # Empty checklist - no unchecked items
+            state.tracks = {}
+            state.active_track = None
 
             # Create mock controller
             ctrl = MagicMock(spec=WorkflowController)
@@ -73,9 +75,13 @@ class TestSetStageTokenValidation:
             ctrl.engine = MagicMock()
             ctrl.audit = MagicMock()
 
-            # Bind the real set_stage method to our mock
-            ctrl.set_stage = lambda stage, module=None, force=False, token=None: \
-                WorkflowController.set_stage(ctrl, stage, module, force, token)
+            # Bind the real methods to our mock
+            ctrl._resolve_track_id = lambda track=None: \
+                WorkflowController._resolve_track_id(ctrl, track)
+            ctrl._get_effective_state = lambda track=None: \
+                WorkflowController._get_effective_state(ctrl, track)
+            ctrl.set_stage = lambda stage, module=None, force=False, token=None, track=None: \
+                WorkflowController.set_stage(ctrl, stage, module, force, token, track)
 
             yield ctrl
 
