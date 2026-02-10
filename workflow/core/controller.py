@@ -1,10 +1,10 @@
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 import os
 import re
 import json
 import subprocess
 from datetime import datetime
-from .state import WorkflowState, CheckItem
+from .state import WorkflowState, CheckItem, TrackState
 from .schema import WorkflowConfigV2, ChecklistItemConfig, RalphConfig, FileCheckConfig, PlatformActionConfig
 from .parser import GuideParser, ConfigParserV2
 from .engine import WorkflowEngine
@@ -39,6 +39,32 @@ class WorkflowController:
 
     def _update_context_from_state(self):
         self.context.update("active_module", getattr(self.state, 'active_module', 'unknown'))
+
+    def _get_effective_state(self, track: Optional[str] = None) -> Union[WorkflowState, TrackState]:
+        """Return track-scoped state or global state.
+
+        Priority: explicit track param > state.active_track > global state.
+
+        WARNING: If the resolved track ID does not exist in self.state.tracks,
+        this method falls back to global state silently. Callers MUST validate
+        track existence before calling this method if they need error handling
+        for nonexistent tracks. All public methods (check, status, next_stage,
+        set_module, uncheck) already perform this validation.
+        """
+        effective_track = self._resolve_track_id(track)
+        if effective_track and effective_track in self.state.tracks:
+            return self.state.tracks[effective_track]
+        return self.state
+
+    def _resolve_track_id(self, track: Optional[str] = None) -> Optional[str]:
+        """Resolve effective track ID (without falling back to global).
+
+        Returns the resolved track ID or None if no track is active.
+        """
+        if track:
+            return track
+        active = getattr(self.state, 'active_track', None)
+        return active if isinstance(active, str) else None
 
     def _get_ralph_state_file(self) -> str:
         """Get path to ralph state file."""
@@ -232,7 +258,26 @@ class WorkflowController:
 
         return "\n".join(prompt_lines)
 
-    def status(self) -> str:
+    def status(self, track: Optional[str] = None, all_tracks: bool = False) -> str:
+        # Mode 1: --all — summary of all tracks
+        if all_tracks:
+            return self._status_all_tracks()
+
+        # Mode 2/3: resolve effective track
+        effective_track = track or self.state.active_track
+        if effective_track:
+            if effective_track not in self.state.tracks:
+                return t('controller.track.not_found', id=effective_track)
+            return self._status_single_track(effective_track)
+
+        # Mode 3: global status (with track warning if tracks exist)
+        result = self._status_global()
+        if self.state.tracks:
+            result += "\n" + t('controller.track.active_warning', count=len(self.state.tracks))
+        return result
+
+    def _status_global(self) -> str:
+        """Render global (non-track) status. Extracted from original status()."""
         if not self.state.current_stage:
             return t('controller.status.not_initialized')
 
@@ -241,31 +286,100 @@ class WorkflowController:
             return t('controller.status.stage_not_found', stage=self.state.current_stage)
 
         header_title = stage.label
+        self._merge_checklist(self.state, stage)
+        self.state.save(self.config.state_file)
 
-        # Priority: workflow.yaml checklist > PROJECT_MANAGEMENT_GUIDE.md
+        output = self._render_checklist_output(
+            self.state, header_title, self.state.current_stage
+        )
+        unchecked_indices = [i + 1 for i, item in enumerate(self.state.checklist) if not item.checked]
+        self._update_active_status_file("\n".join(output), unchecked_indices)
+        return "\n".join(output)
+
+    def _status_single_track(self, track_id: str) -> str:
+        """Render status for a single track."""
+        ts = self.state.tracks[track_id]
+
+        # Set engine to track's stage for checklist resolution
+        if ts.current_stage and ts.current_stage in self.config.stages:
+            self.engine.set_stage(ts.current_stage)
+
+        try:
+            stage = self.engine.current_stage
+            if not stage:
+                return t('controller.status.stage_not_found', stage=ts.current_stage)
+
+            header_title = stage.label
+            self._merge_checklist(ts, stage)
+            self.state.save(self.config.state_file)
+
+            output = [f"[Track {track_id}] {ts.label}"]
+            output += self._render_checklist_output(ts, header_title, ts.current_stage, track_id=track_id)
+
+            unchecked_indices = [i + 1 for i, item in enumerate(ts.checklist) if not item.checked]
+            self._update_active_status_file("\n".join(output), unchecked_indices, track_id=track_id)
+
+            return "\n".join(output)
+        finally:
+            # Restore engine to global stage
+            if self.state.current_stage and self.state.current_stage in self.config.stages:
+                self.engine.set_stage(self.state.current_stage)
+
+    def _status_all_tracks(self) -> str:
+        """Render summary of all tracks."""
+        if not self.state.tracks:
+            return self._status_global()
+
+        output = [f"Current Milestone: {self.state.current_milestone}", "=" * 40]
+        output.append(t('controller.track.list_header', count=len(self.state.tracks)))
+        output.append("=" * 40)
+        output.append("")
+
+        for tid, ts in self.state.tracks.items():
+            checked = sum(1 for i in ts.checklist if i.checked)
+            total = len(ts.checklist)
+            stage_label = ""
+            if ts.current_stage in self.config.stages:
+                stage_label = f" ({self.config.stages[ts.current_stage].label})"
+
+            output.append(f"[Track {tid}] {ts.label}")
+            output.append(f"  Stage: {ts.current_stage}{stage_label}")
+            output.append(f"  Module: {ts.active_module}")
+            output.append(f"  Progress: {checked}/{total} completed")
+
+            unchecked = [i + 1 for i, item in enumerate(ts.checklist) if not item.checked]
+            if unchecked:
+                indices_str = " ".join(map(str, unchecked[:3]))
+                output.append(f"  → Next: `flow check {indices_str} --track {tid}`")
+            else:
+                output.append(f"  → All done. `flow next --track {tid}`")
+            output.append("")
+
+        output.append("=" * 40)
+        output.append("→ All tracks done? → `flow track join`")
+        return "\n".join(output)
+
+    def _merge_checklist(self, effective: Union[WorkflowState, TrackState], stage) -> None:
+        """Merge workflow.yaml/guide checklist into effective state's checklist."""
         if stage.checklist:
-            # Use checklist from workflow.yaml (supports both string and ChecklistItemConfig)
             guide_items = []
             for item in stage.checklist:
                 if isinstance(item, str):
                     guide_items.append(CheckItem(text=item, checked=False))
                 else:
-                    # ChecklistItemConfig object
                     guide_items.append(CheckItem(text=item.text, checked=False))
         else:
-            # Fallback to PROJECT_MANAGEMENT_GUIDE.md
-            guide_items = self.parser.extract_checklist(header_title)
+            guide_items = self.parser.extract_checklist(stage.label)
 
-        checked_map = {item.text: item.checked for item in self.state.checklist}
-        evidence_map = {item.text: item.evidence for item in self.state.checklist}
-        agent_map = {item.text: item.required_agent for item in self.state.checklist}
+        checked_map = {item.text: item.checked for item in effective.checklist}
+        evidence_map = {item.text: item.evidence for item in effective.checklist}
+        agent_map = {item.text: item.required_agent for item in effective.checklist}
 
         merged_list = []
         for g_item in guide_items:
             is_checked = checked_map.get(g_item.text, g_item.checked)
             evidence = evidence_map.get(g_item.text, None)
 
-            # Extract [AGENT:name] tag
             required_agent = agent_map.get(g_item.text)
             agent_match = re.search(r'\[AGENT:([\w-]+)\]', g_item.text)
             if agent_match:
@@ -273,286 +387,303 @@ class WorkflowController:
 
             merged_list.append(CheckItem(g_item.text, is_checked, evidence, required_agent))
 
-        self.state.checklist = merged_list
-        self.state.save(self.config.state_file)
-        
-        # Build Output
-        output = [t('controller.status.header', code=self.state.current_stage, label=header_title), "=" * 40]
-        output.append(t('controller.status.module', module=self.context.data.get('active_module', 'None')))
+        effective.checklist = merged_list
+
+    def _render_checklist_output(self, effective: Union[WorkflowState, TrackState], header_title: str, stage_code: str, track_id: Optional[str] = None) -> list:
+        """Render checklist output lines."""
+        output = [t('controller.status.header', code=stage_code, label=header_title), "=" * 40]
+        output.append(t('controller.status.module', module=effective.active_module or 'None'))
         output.append("-" * 40)
 
-        for idx, item in enumerate(self.state.checklist):
+        for idx, item in enumerate(effective.checklist):
             mark = "[x]" if item.checked else "[ ]"
             agent_label = f" (Req: {item.required_agent})" if item.required_agent else ""
             output.append(f"{idx + 1}. {mark} {item.text}{agent_label}")
 
-        # Calculate progress and suggest next action
-        unchecked_indices = [i + 1 for i, item in enumerate(self.state.checklist) if not item.checked]
-        checked_count = len(self.state.checklist) - len(unchecked_indices)
-        total_count = len(self.state.checklist)
+        unchecked_indices = [i + 1 for i, item in enumerate(effective.checklist) if not item.checked]
+        checked_count = len(effective.checklist) - len(unchecked_indices)
+        total_count = len(effective.checklist)
 
         output.append("-" * 40)
         output.append(t('controller.status.progress', checked=checked_count, total=total_count))
 
+        track_suffix = f" --track {track_id}" if track_id else ""
         if unchecked_indices:
             indices_str = " ".join(map(str, unchecked_indices[:3]))
             if len(unchecked_indices) > 3:
                 indices_str += " ..."
-            output.append(t('controller.status.next_check', indices=indices_str))
+            output.append(t('controller.status.next_check', indices=indices_str + track_suffix))
         else:
             output.append(t('controller.status.all_done'))
 
-        # Update Hook File with hints
-        self._update_active_status_file("\n".join(output), unchecked_indices)
+        return output
 
-        return "\n".join(output)
-
-    def check(self, indices: List[int], token: Optional[str] = None, evidence: Optional[str] = None, args: Optional[str] = None, skip_action: bool = False, agent: Optional[str] = None) -> str:
+    def check(self, indices: List[int], token: Optional[str] = None, evidence: Optional[str] = None, args: Optional[str] = None, skip_action: bool = False, agent: Optional[str] = None, track: Optional[str] = None) -> str:
         results = []
 
-        # Pre-register agent review if --agent flag provided
-        if agent:
-            self.record_review(agent, f"Registered via check --agent")
-            results.append(t('controller.check.agent_registered', agent=agent))
+        # Resolve track
+        effective_track = self._resolve_track_id(track)
+        if effective_track and effective_track not in self.state.tracks:
+            return t('controller.track.not_found', id=effective_track)
+        effective = self._get_effective_state(track)
 
-        # Get stage config for action definitions
-        stage_config = self.config.stages.get(self.state.current_stage)
+        # Set engine to effective stage for action config lookup
+        if effective_track and effective.current_stage in self.config.stages:
+            self.engine.set_stage(effective.current_stage)
 
-        for index in indices:
-            if index < 1 or index > len(self.state.checklist):
-                results.append(t('controller.check.invalid_index', index=index))
-                continue
+        try:
+            # Pre-register agent review if --agent flag provided
+            if agent:
+                self.record_review(agent, f"Registered via check --agent")
+                results.append(t('controller.check.agent_registered', agent=agent))
 
-            item = self.state.checklist[index - 1]
+            # Get stage config for action definitions
+            stage_config = self.config.stages.get(effective.current_stage)
 
-            # Get action config from stage definition (if available)
-            item_config = self._get_item_config(stage_config, index - 1) if stage_config else None
-
-            # Extract required_agent from text if not already set (defensive check)
-            required_agent = item.required_agent
-            if not required_agent:
-                agent_match = re.search(r'\[AGENT:([\w-]+)\]', item.text)
-                if agent_match:
-                    required_agent = agent_match.group(1)
-                    item.required_agent = required_agent  # Update for future reference
-
-            # 1. Authorization Check (SHA-256)
-            if item.text.strip().startswith("[USER-APPROVE]"):
-                if not token:
-                    results.append(t('controller.check.token_required'))
-                    continue
-                if not verify_token(token):
-                    results.append(t('controller.check.invalid_token', text=item.text))
+            for index in indices:
+                if index < 1 or index > len(effective.checklist):
+                    results.append(t('controller.check.invalid_index', index=index))
                     continue
 
-            # 2. Agent Verification Check
-            if required_agent:
-                if not self._verify_agent_review(required_agent):
-                    results.append(t('controller.check.agent_not_found', agent=required_agent))
-                    continue
+                item = effective.checklist[index - 1]
 
-            # 3. Execute file_check (if defined and not skipped)
-            if item_config and item_config.file_check and not skip_action:
-                file_check_result = self._execute_file_check(item_config)
+                # Get action config from stage definition (if available)
+                item_config = self._get_item_config(stage_config, index - 1) if stage_config else None
 
-                # Check output patterns for Ralph mode if applicable
-                file_check_success = file_check_result['success']
-                pattern_check_reason = None
-                if item_config.ralph and (item_config.ralph.success_contains or item_config.ralph.fail_contains):
-                    pattern_result = self._check_output_patterns(
-                        file_check_result.get('output', ''),
-                        item_config.ralph
-                    )
-                    if pattern_result['success'] is not None:
-                        file_check_success = pattern_result['success']
-                        pattern_check_reason = pattern_result['reason']
-                        if pattern_result['matched_pattern']:
-                            file_check_result['matched_pattern'] = pattern_result['matched_pattern']
+                # Extract required_agent from text if not already set (defensive check)
+                required_agent = item.required_agent
+                if not required_agent:
+                    agent_match = re.search(r'\[AGENT:([\w-]+)\]', item.text)
+                    if agent_match:
+                        required_agent = agent_match.group(1)
+                        item.required_agent = required_agent  # Update for future reference
 
-                if not file_check_success:
-                    # Set error message based on pattern check result
-                    if pattern_check_reason == 'fail_pattern_matched':
-                        file_check_result['error'] = t('controller.check.fail_pattern_found',
-                                                       pattern=file_check_result.get('matched_pattern', ''))
-                    elif pattern_check_reason == 'success_pattern_not_found':
-                        file_check_result['error'] = t('controller.check.success_pattern_missing')
+                # 1. Authorization Check (SHA-256)
+                if item.text.strip().startswith("[USER-APPROVE]"):
+                    if not token:
+                        results.append(t('controller.check.token_required'))
+                        continue
+                    if not verify_token(token):
+                        results.append(t('controller.check.invalid_token', text=item.text))
+                        continue
 
-                    # Check if Ralph mode is enabled for this item
-                    if item_config.ralph and item_config.ralph.enabled:
-                        attempt = self._update_ralph_state(
-                            index,
-                            file_check_result.get('error', ''),
-                            file_check_result.get('output', '')
+                # 2. Agent Verification Check
+                if required_agent:
+                    if not self._verify_agent_review(required_agent):
+                        results.append(t('controller.check.agent_not_found', agent=required_agent))
+                        continue
+
+                # 3. Execute file_check (if defined and not skipped)
+                if item_config and item_config.file_check and not skip_action:
+                    file_check_result = self._execute_file_check(item_config)
+
+                    # Check output patterns for Ralph mode if applicable
+                    file_check_success = file_check_result['success']
+                    pattern_check_reason = None
+                    if item_config.ralph and (item_config.ralph.success_contains or item_config.ralph.fail_contains):
+                        pattern_result = self._check_output_patterns(
+                            file_check_result.get('output', ''),
+                            item_config.ralph
                         )
-                        max_retries = item_config.ralph.max_retries
+                        if pattern_result['success'] is not None:
+                            file_check_success = pattern_result['success']
+                            pattern_check_reason = pattern_result['reason']
+                            if pattern_result['matched_pattern']:
+                                file_check_result['matched_pattern'] = pattern_result['matched_pattern']
 
-                        if attempt <= max_retries:
-                            # Generate Ralph mode prompt for file_check
-                            ralph_prompt = self._generate_file_check_ralph_prompt(
-                                index, item_config, file_check_result, attempt
+                    if not file_check_success:
+                        # Set error message based on pattern check result
+                        if pattern_check_reason == 'fail_pattern_matched':
+                            file_check_result['error'] = t('controller.check.fail_pattern_found',
+                                                           pattern=file_check_result.get('matched_pattern', ''))
+                        elif pattern_check_reason == 'success_pattern_not_found':
+                            file_check_result['error'] = t('controller.check.success_pattern_missing')
+
+                        # Check if Ralph mode is enabled for this item
+                        if item_config.ralph and item_config.ralph.enabled:
+                            attempt = self._update_ralph_state(
+                                index,
+                                file_check_result.get('error', ''),
+                                file_check_result.get('output', '')
                             )
-                            results.append(ralph_prompt)
-                            self.state.save(self.config.state_file)
-                            return "\n".join(results)
-                        else:
-                            # Max retries exceeded
-                            results.append(t('controller.ralph.max_retries_exceeded',
-                                           index=index, max_retries=max_retries))
-                            self._clear_ralph_state(index)
-                            continue
+                            max_retries = item_config.ralph.max_retries
 
-                    # Normal failure handling (no Ralph mode)
-                    error_msg = file_check_result.get('error', '')
-                    results.append(t('controller.check.file_check_failed', index=index, error=error_msg))
-                    # Show file content preview if available
-                    if file_check_result.get('output'):
-                        output_lines = file_check_result['output'].strip().split('\n')
-                        if len(output_lines) > 10:
-                            results.append(t('controller.check.action_output_header'))
-                            for line in output_lines[-10:]:
-                                results.append(t('controller.check.action_output_line', line=line))
-                        else:
-                            results.append(t('controller.check.action_output_short'))
-                            for line in output_lines:
-                                results.append(t('controller.check.action_output_line', line=line))
-                    results.append(t('controller.check.action_skip_hint'))
-                    continue
+                            if attempt <= max_retries:
+                                # Generate Ralph mode prompt for file_check
+                                ralph_prompt = self._generate_file_check_ralph_prompt(
+                                    index, item_config, file_check_result, attempt
+                                )
+                                results.append(ralph_prompt)
+                                self.state.save(self.config.state_file)
+                                return "\n".join(results)
+                            else:
+                                # Max retries exceeded
+                                results.append(t('controller.ralph.max_retries_exceeded',
+                                               index=index, max_retries=max_retries))
+                                self._clear_ralph_state(index)
+                                continue
 
-                # file_check succeeded - clear ralph state if any
-                if item_config.ralph:
-                    self._clear_ralph_state(index)
-                results.append(t('controller.check.file_check_executed', path=item_config.file_check.path))
-                # Show pattern match info if applicable
-                if file_check_result.get('matched_pattern'):
-                    results.append(t('controller.check.pattern_matched', pattern=file_check_result['matched_pattern']))
+                        # Normal failure handling (no Ralph mode)
+                        error_msg = file_check_result.get('error', '')
+                        results.append(t('controller.check.file_check_failed', index=index, error=error_msg))
+                        # Show file content preview if available
+                        if file_check_result.get('output'):
+                            output_lines = file_check_result['output'].strip().split('\n')
+                            if len(output_lines) > 10:
+                                results.append(t('controller.check.action_output_header'))
+                                for line in output_lines[-10:]:
+                                    results.append(t('controller.check.action_output_line', line=line))
+                            else:
+                                results.append(t('controller.check.action_output_short'))
+                                for line in output_lines:
+                                    results.append(t('controller.check.action_output_line', line=line))
+                        results.append(t('controller.check.action_skip_hint'))
+                        continue
 
-            elif item_config and item_config.file_check and skip_action:
-                results.append(t('controller.check.file_check_skipped', index=index, path=item_config.file_check.path))
+                    # file_check succeeded - clear ralph state if any
+                    if item_config.ralph:
+                        self._clear_ralph_state(index)
+                    results.append(t('controller.check.file_check_executed', path=item_config.file_check.path))
+                    # Show pattern match info if applicable
+                    if file_check_result.get('matched_pattern'):
+                        results.append(t('controller.check.pattern_matched', pattern=file_check_result['matched_pattern']))
 
-            # 4. Execute Action (if defined and not skipped)
-            if item_config and item_config.action and not skip_action:
-                action_result = self._execute_action(item_config, args)
+                elif item_config and item_config.file_check and skip_action:
+                    results.append(t('controller.check.file_check_skipped', index=index, path=item_config.file_check.path))
 
-                # Check output patterns if ralph config has success_contains or fail_contains
-                action_success = action_result['success']
-                pattern_check_reason = None
-                if item_config.ralph and (item_config.ralph.success_contains or item_config.ralph.fail_contains):
-                    pattern_result = self._check_output_patterns(
-                        action_result.get('output', '') + action_result.get('error', ''),
-                        item_config.ralph
-                    )
-                    if pattern_result['success'] is not None:
-                        action_success = pattern_result['success']
-                        pattern_check_reason = pattern_result['reason']
-                        if pattern_result['matched_pattern']:
-                            action_result['matched_pattern'] = pattern_result['matched_pattern']
+                # 4. Execute Action (if defined and not skipped)
+                if item_config and item_config.action and not skip_action:
+                    action_result = self._execute_action(item_config, args)
 
-                if not action_success:
-                    # Set error message based on pattern check result
-                    if pattern_check_reason == 'fail_pattern_matched':
-                        action_result['error'] = t('controller.check.fail_pattern_found',
-                                                   pattern=action_result.get('matched_pattern', ''))
-                    elif pattern_check_reason == 'success_pattern_not_found':
-                        action_result['error'] = t('controller.check.success_pattern_missing')
-
-                    # Check if Ralph mode is enabled for this item
-                    if item_config.ralph and item_config.ralph.enabled:
-                        attempt = self._update_ralph_state(
-                            index,
-                            action_result.get('error', ''),
-                            action_result.get('output', '')
+                    # Check output patterns if ralph config has success_contains or fail_contains
+                    action_success = action_result['success']
+                    pattern_check_reason = None
+                    if item_config.ralph and (item_config.ralph.success_contains or item_config.ralph.fail_contains):
+                        pattern_result = self._check_output_patterns(
+                            action_result.get('output', '') + action_result.get('error', ''),
+                            item_config.ralph
                         )
-                        max_retries = item_config.ralph.max_retries
+                        if pattern_result['success'] is not None:
+                            action_success = pattern_result['success']
+                            pattern_check_reason = pattern_result['reason']
+                            if pattern_result['matched_pattern']:
+                                action_result['matched_pattern'] = pattern_result['matched_pattern']
 
-                        if attempt <= max_retries:
-                            # Generate Ralph mode prompt for Task subagent
-                            ralph_prompt = self._generate_ralph_prompt(
-                                index, item_config, action_result, attempt
+                    if not action_success:
+                        # Set error message based on pattern check result
+                        if pattern_check_reason == 'fail_pattern_matched':
+                            action_result['error'] = t('controller.check.fail_pattern_found',
+                                                       pattern=action_result.get('matched_pattern', ''))
+                        elif pattern_check_reason == 'success_pattern_not_found':
+                            action_result['error'] = t('controller.check.success_pattern_missing')
+
+                        # Check if Ralph mode is enabled for this item
+                        if item_config.ralph and item_config.ralph.enabled:
+                            attempt = self._update_ralph_state(
+                                index,
+                                action_result.get('error', ''),
+                                action_result.get('output', '')
                             )
-                            results.append(ralph_prompt)
-                            self.state.save(self.config.state_file)
-                            return "\n".join(results)
-                        else:
-                            # Max retries exceeded
-                            results.append(t('controller.ralph.max_retries_exceeded',
-                                           index=index, max_retries=max_retries))
-                            self._clear_ralph_state(index)
-                            continue
+                            max_retries = item_config.ralph.max_retries
 
-                    # Normal failure handling (no Ralph mode)
-                    error_msg = action_result.get('error', '')
-                    if pattern_check_reason == 'fail_pattern_matched':
-                        error_msg = t('controller.check.fail_pattern_found', pattern=action_result.get('matched_pattern', ''))
-                    elif pattern_check_reason == 'success_pattern_not_found':
-                        error_msg = t('controller.check.success_pattern_missing')
-                    results.append(t('controller.check.action_failed', index=index, error=error_msg))
-                    # Show stdout if available (useful for test output, etc.)
+                            if attempt <= max_retries:
+                                # Generate Ralph mode prompt for Task subagent
+                                ralph_prompt = self._generate_ralph_prompt(
+                                    index, item_config, action_result, attempt
+                                )
+                                results.append(ralph_prompt)
+                                self.state.save(self.config.state_file)
+                                return "\n".join(results)
+                            else:
+                                # Max retries exceeded
+                                results.append(t('controller.ralph.max_retries_exceeded',
+                                               index=index, max_retries=max_retries))
+                                self._clear_ralph_state(index)
+                                continue
+
+                        # Normal failure handling (no Ralph mode)
+                        error_msg = action_result.get('error', '')
+                        if pattern_check_reason == 'fail_pattern_matched':
+                            error_msg = t('controller.check.fail_pattern_found', pattern=action_result.get('matched_pattern', ''))
+                        elif pattern_check_reason == 'success_pattern_not_found':
+                            error_msg = t('controller.check.success_pattern_missing')
+                        results.append(t('controller.check.action_failed', index=index, error=error_msg))
+                        # Show stdout if available (useful for test output, etc.)
+                        if action_result.get('output'):
+                            output_lines = action_result['output'].strip().split('\n')
+                            # Show last 10 lines of output (most relevant for failures)
+                            if len(output_lines) > 10:
+                                results.append(t('controller.check.action_output_header'))
+                                for line in output_lines[-10:]:
+                                    results.append(t('controller.check.action_output_line', line=line))
+                            else:
+                                results.append(t('controller.check.action_output_short'))
+                                for line in output_lines:
+                                    results.append(t('controller.check.action_output_line', line=line))
+                        results.append(t('controller.check.action_skip_hint'))
+                        continue
+
+                    # Action succeeded - clear ralph state if any
+                    if item_config.ralph:
+                        self._clear_ralph_state(index)
+                    results.append(t('controller.check.action_executed', command=action_result['command']))
+                    # Show pattern match info if applicable
+                    if action_result.get('matched_pattern'):
+                        results.append(t('controller.check.pattern_matched', pattern=action_result['matched_pattern']))
                     if action_result.get('output'):
-                        output_lines = action_result['output'].strip().split('\n')
-                        # Show last 10 lines of output (most relevant for failures)
-                        if len(output_lines) > 10:
-                            results.append(t('controller.check.action_output_header'))
-                            for line in output_lines[-10:]:
-                                results.append(t('controller.check.action_output_line', line=line))
-                        else:
-                            results.append(t('controller.check.action_output_short'))
-                            for line in output_lines:
-                                results.append(t('controller.check.action_output_line', line=line))
-                    results.append(t('controller.check.action_skip_hint'))
-                    continue
+                        results.append(t('controller.check.action_output', output=action_result['output'][:200]))
+                elif item_config and item_config.action and skip_action:
+                    results.append(t('controller.check.action_skipped', index=index, action=item_config.action))
 
-                # Action succeeded - clear ralph state if any
-                if item_config.ralph:
-                    self._clear_ralph_state(index)
-                results.append(t('controller.check.action_executed', command=action_result['command']))
-                # Show pattern match info if applicable
-                if action_result.get('matched_pattern'):
-                    results.append(t('controller.check.pattern_matched', pattern=action_result['matched_pattern']))
-                if action_result.get('output'):
-                    results.append(t('controller.check.action_output', output=action_result['output'][:200]))
-            elif item_config and item_config.action and skip_action:
-                results.append(t('controller.check.action_skipped', index=index, action=item_config.action))
+                item.checked = True
+                if evidence:
+                    item.evidence = evidence
 
-            item.checked = True
-            if evidence:
-                item.evidence = evidence
+                results.append(t('controller.check.checked', text=item.text))
 
-            results.append(t('controller.check.checked', text=item.text))
+                # Log individual check with action/file_check info
+                log_data = {
+                    "milestone": self.state.current_milestone,
+                    "phase": self.state.current_phase,
+                    "stage": effective.current_stage,
+                    "item": item.text,
+                    "evidence": evidence
+                }
+                if effective_track:
+                    log_data["track"] = effective_track
+                if item_config and item_config.action:
+                    # Log action (handle both string and PlatformActionConfig)
+                    if isinstance(item_config.action, str):
+                        log_data["action_executed"] = item_config.action
+                    elif isinstance(item_config.action, PlatformActionConfig):
+                        log_data["action_executed"] = item_config.action.get_command()
+                    log_data["action_args"] = args
+                if item_config and item_config.file_check:
+                    log_data["file_check_path"] = item_config.file_check.path
+                self.audit.logger.log_event("MANUAL_CHECK", log_data)
 
-            # Log individual check with action/file_check info
-            log_data = {
-                "milestone": self.state.current_milestone,
-                "phase": self.state.current_phase,
-                "stage": self.state.current_stage,
-                "item": item.text,
-                "evidence": evidence
-            }
-            if item_config and item_config.action:
-                # Log action (handle both string and PlatformActionConfig)
-                if isinstance(item_config.action, str):
-                    log_data["action_executed"] = item_config.action
-                elif isinstance(item_config.action, PlatformActionConfig):
-                    log_data["action_executed"] = item_config.action.get_command()
-                log_data["action_args"] = args
-            if item_config and item_config.file_check:
-                log_data["file_check_path"] = item_config.file_check.path
-            self.audit.logger.log_event("MANUAL_CHECK", log_data)
+            self.state.save(self.config.state_file)
+            return "\n".join(results)
+        finally:
+            # Restore engine to global stage if track was used
+            if effective_track and self.state.current_stage in self.config.stages:
+                self.engine.set_stage(self.state.current_stage)
 
-        self.state.save(self.config.state_file)
-        # Note: Removed self.status() call here to avoid redundant state processing
-        # and potential timeout issues. The status will be updated on next status call.
-        return "\n".join(results)
-
-    def uncheck(self, indices: List[int], token: Optional[str] = None) -> str:
+    def uncheck(self, indices: List[int], token: Optional[str] = None, track: Optional[str] = None) -> str:
         """Unmark checklist items (reverse of check)."""
+        effective_track = self._resolve_track_id(track)
+        if effective_track and effective_track not in self.state.tracks:
+            return t('controller.track.not_found', id=effective_track)
+        effective = self._get_effective_state(track)
+
         results = []
 
         for index in indices:
-            if index < 1 or index > len(self.state.checklist):
+            if index < 1 or index > len(effective.checklist):
                 results.append(t('controller.uncheck.invalid_index', index=index))
                 continue
 
-            item = self.state.checklist[index - 1]
+            item = effective.checklist[index - 1]
 
             # Check if item is already unchecked
             if not item.checked:
@@ -574,17 +705,20 @@ class WorkflowController:
             results.append(t('controller.uncheck.unchecked', text=item.text))
 
             # Log uncheck event
-            self.audit.logger.log_event("MANUAL_UNCHECK", {
+            log_data = {
                 "milestone": self.state.current_milestone,
                 "phase": self.state.current_phase,
-                "stage": self.state.current_stage,
+                "stage": effective.current_stage,
                 "item": item.text
-            })
+            }
+            if effective_track:
+                log_data["track"] = effective_track
+            self.audit.logger.log_event("MANUAL_UNCHECK", log_data)
 
         self.state.save(self.config.state_file)
         return "\n".join(results)
 
-    def check_by_tag(self, tag: str, evidence: Optional[str] = None) -> str:
+    def check_by_tag(self, tag: str, evidence: Optional[str] = None, track: Optional[str] = None) -> str:
         """
         Find and check items matching a specific tag pattern.
 
@@ -594,10 +728,16 @@ class WorkflowController:
         Args:
             tag: Tag to match (e.g., "CMD:pytest" matches "[CMD:pytest]")
             evidence: Optional evidence to attach
+            track: Optional track ID to scope the search
 
         Returns:
             Result message
         """
+        effective_track = self._resolve_track_id(track)
+        if effective_track and effective_track not in self.state.tracks:
+            return t('controller.track.not_found', id=effective_track)
+        effective = self._get_effective_state(track)
+
         # Normalize tag format
         if not tag.startswith("["):
             tag = f"[{tag}]"
@@ -606,7 +746,7 @@ class WorkflowController:
 
         # Find matching unchecked items
         matching_indices = []
-        for i, item in enumerate(self.state.checklist):
+        for i, item in enumerate(effective.checklist):
             if not item.checked and tag in item.text:
                 matching_indices.append(i + 1)  # 1-based index
 
@@ -622,7 +762,7 @@ class WorkflowController:
 
         # Check all matching items
         auto_evidence = evidence or f"Auto-checked by tag {tag}"
-        check_result = self.check(matching_indices, evidence=auto_evidence)
+        check_result = self.check(matching_indices, evidence=auto_evidence, track=track)
         result.append(check_result)
 
         return "\n".join(result)
@@ -780,147 +920,172 @@ class WorkflowController:
             if args and 'args' in self.context.data:
                 del self.context.data['args']
 
-    def next_stage(self, target: Optional[str] = None, force: bool = False, reason: str = "", token: Optional[str] = None, skip_conditions: bool = False) -> str:
+    def next_stage(self, target: Optional[str] = None, force: bool = False, reason: str = "", token: Optional[str] = None, skip_conditions: bool = False, track: Optional[str] = None) -> str:
         """Attempts to move to the next stage after validating conditions."""
-        if force:
-            # Force requires USER-APPROVE token
-            if not token:
-                return t('controller.next.force_token_required')
-            if not verify_token(token):
-                return t('controller.next.force_invalid_token')
-            if not reason.strip():
-                return t('controller.next.force_reason_required')
+        # Resolve track
+        effective_track = self._resolve_track_id(track)
+        if effective_track and effective_track not in self.state.tracks:
+            return t('controller.track.not_found', id=effective_track)
+        effective = self._get_effective_state(track)
 
-        # 1. Validate Checklist (Human Requirement)
-        unchecked = [i for i in self.state.checklist if not i.checked]
-        if unchecked and not force:
-            return t('controller.next.unchecked_items') + "\n" + "\n".join([t('controller.next.unchecked_item', text=i.text) for i in unchecked])
+        # Set engine to effective stage
+        if effective_track and effective.current_stage in self.config.stages:
+            self.engine.set_stage(effective.current_stage)
 
-        # 2. Determine Transition
-        available = self.engine.get_available_transitions()
-        if not available:
-            return t('controller.next.end_of_sequence')
+        try:
+            if force:
+                # Force requires USER-APPROVE token
+                if not token:
+                    return t('controller.next.force_token_required')
+                if not verify_token(token):
+                    return t('controller.next.force_invalid_token')
+                if not reason.strip():
+                    return t('controller.next.force_reason_required')
 
-        if target:
-            transition = self.engine.get_transition(target)
-            if not transition:
-                return t('controller.next.invalid_target', target=target, choices=[tr.target for tr in available])
-        else:
-            if len(available) > 1:
-                return t('controller.next.branching_point', choices=[tr.target for tr in available])
-            transition = available[0]
+            # 1. Validate Checklist (Human Requirement)
+            unchecked = [i for i in effective.checklist if not i.checked]
+            if unchecked and not force:
+                return t('controller.next.unchecked_items') + "\n" + "\n".join([t('controller.next.unchecked_item', text=i.text) for i in unchecked])
 
-        # 3. Validate Conditions (System Requirement)
-        self._update_context_from_state()
-        resolved_conditions = self.engine.resolve_conditions(transition.conditions)
+            # 2. Determine Transition
+            available = self.engine.get_available_transitions()
+            if not available:
+                # Track completion: mark as complete
+                if effective_track:
+                    self.state.tracks[effective_track].status = "complete"
+                    self.state.save(self.config.state_file)
+                    return t('controller.track.completed', id=effective_track)
+                return t('controller.next.end_of_sequence')
 
-        errors = []
-        rule_results = []
+            if target:
+                transition = self.engine.get_transition(target)
+                if not transition:
+                    return t('controller.next.invalid_target', target=target, choices=[tr.target for tr in available])
+            else:
+                if len(available) > 1:
+                    return t('controller.next.branching_point', choices=[tr.target for tr in available])
+                transition = available[0]
 
-        # Skip plugin conditions (shell, fs, etc.) if skip_conditions flag is set
-        # but always validate all_checked and user_approved rules
-        skip_rules = {'shell', 'fs', 'file_exists', 'command'} if skip_conditions else set()
+            # 3. Validate Conditions (System Requirement)
+            self._update_context_from_state()
+            resolved_conditions = self.engine.resolve_conditions(transition.conditions)
 
-        # Create evaluator for 'when' clauses
-        when_evaluator = WhenEvaluator(self.context.data)
+            errors = []
+            rule_results = []
 
-        for cond in resolved_conditions:
-            # Skip certain rules if skip_conditions is enabled
-            if cond.rule in skip_rules:
-                rule_results.append({
-                    "rule": cond.rule,
-                    "args": cond.args,
-                    "status": "SKIPPED",
-                    "reason": "skip_conditions flag"
-                })
-                continue
+            # Skip plugin conditions (shell, fs, etc.) if skip_conditions flag is set
+            # but always validate all_checked and user_approved rules
+            skip_rules = {'shell', 'fs', 'file_exists', 'command'} if skip_conditions else set()
 
-            # Evaluate 'when' clause if present
-            if cond.when:
-                try:
-                    if not when_evaluator.evaluate(cond.when):
-                        rule_results.append({
-                            "rule": cond.rule,
-                            "args": cond.args,
-                            "status": "SKIPPED",
-                            "reason": f"when condition not met: {cond.when}"
-                        })
-                        continue
-                except ValueError as e:
+            # Create evaluator for 'when' clauses
+            when_evaluator = WhenEvaluator(self.context.data)
+
+            for cond in resolved_conditions:
+                # Skip certain rules if skip_conditions is enabled
+                if cond.rule in skip_rules:
                     rule_results.append({
                         "rule": cond.rule,
                         "args": cond.args,
-                        "status": "ERROR",
-                        "error": f"Invalid when expression: {e}"
+                        "status": "SKIPPED",
+                        "reason": "skip_conditions flag"
                     })
-                    errors.append(f"Invalid when expression in {cond.rule}: {e}")
                     continue
 
-            res_entry = {"rule": cond.rule, "args": cond.args}
+                # Evaluate 'when' clause if present
+                if cond.when:
+                    try:
+                        if not when_evaluator.evaluate(cond.when):
+                            rule_results.append({
+                                "rule": cond.rule,
+                                "args": cond.args,
+                                "status": "SKIPPED",
+                                "reason": f"when condition not met: {cond.when}"
+                            })
+                            continue
+                    except ValueError as e:
+                        rule_results.append({
+                            "rule": cond.rule,
+                            "args": cond.args,
+                            "status": "ERROR",
+                            "error": f"Invalid when expression: {e}"
+                        })
+                        errors.append(f"Invalid when expression in {cond.rule}: {e}")
+                        continue
 
-            # Built-in rules: evaluated directly without registry lookup
-            builtin_result = self._evaluate_builtin_rule(cond.rule)
-            if builtin_result is not None:
-                passed = builtin_result
-                res_entry["status"] = "PASS" if passed else "FAIL"
-                if not passed:
-                    msg = cond.fail_message or f"Built-in rule failed: {cond.rule}"
-                    errors.append(msg)
-                    res_entry["error"] = msg
+                res_entry = {"rule": cond.rule, "args": cond.args}
+
+                # Built-in rules: evaluated directly without registry lookup
+                builtin_result = self._evaluate_builtin_rule(cond.rule, effective)
+                if builtin_result is not None:
+                    passed = builtin_result
+                    res_entry["status"] = "PASS" if passed else "FAIL"
+                    if not passed:
+                        msg = cond.fail_message or f"Built-in rule failed: {cond.rule}"
+                        errors.append(msg)
+                        res_entry["error"] = msg
+                    rule_results.append(res_entry)
+                    continue
+
+                # Plugin rules: lookup from registry
+                validator_cls = self.registry.get(cond.rule)
+
+                if not validator_cls:
+                    err_msg = f"Missing validator for rule '{cond.rule}'"
+                    errors.append(err_msg)
+                    res_entry["status"] = "ERROR"
+                    res_entry["error"] = err_msg
+                else:
+                    validator = validator_cls()
+                    passed = validator.validate(cond.args, self.context.data)
+                    res_entry["status"] = "PASS" if passed else "FAIL"
+
+                    # Add evidence if it's a file check
+                    if cond.rule == "file_exists" and passed:
+                        res_entry["hash"] = AuditLogger.get_file_hash(cond.args.get("path"))
+
+                    if not passed:
+                        msg = cond.fail_message or f"Condition failed: {cond.rule} {cond.args}"
+                        errors.append(msg)
+                        res_entry["error"] = msg
+
                 rule_results.append(res_entry)
-                continue
 
-            # Plugin rules: lookup from registry
-            validator_cls = self.registry.get(cond.rule)
+            if errors and not force:
+                return t('controller.next.validation_failed') + "\n" + "\n".join([t('controller.next.validation_error', error=e) for e in errors])
 
-            if not validator_cls:
-                err_msg = f"Missing validator for rule '{cond.rule}'"
-                errors.append(err_msg)
-                res_entry["status"] = "ERROR"
-                res_entry["error"] = err_msg
+            # 4. Success Transition
+            from_stage = effective.current_stage
+            effective.current_stage = transition.target
+            effective.checklist = []
+            self.state.save(self.config.state_file)
+            self.engine.set_stage(transition.target)
+
+            # 5. Record Audit Log
+            audit_data = {
+                "module": effective.active_module or self.context.data.get('active_module', 'unknown'),
+            }
+            if effective_track:
+                audit_data["track"] = effective_track
+            self.audit.record_transition(
+                from_stage=from_stage,
+                to_stage=transition.target,
+                module=audit_data["module"],
+                results=rule_results,
+                forced=force,
+                reason=reason
+            )
+
+            if force:
+                result_msg = t('controller.next.success_forced', stage=transition.target)
+            elif skip_conditions:
+                result_msg = t('controller.next.success_skip_conditions', stage=transition.target)
             else:
-                validator = validator_cls()
-                passed = validator.validate(cond.args, self.context.data)
-                res_entry["status"] = "PASS" if passed else "FAIL"
-
-                # Add evidence if it's a file check
-                if cond.rule == "file_exists" and passed:
-                    res_entry["hash"] = AuditLogger.get_file_hash(cond.args.get("path"))
-
-                if not passed:
-                    msg = cond.fail_message or f"Condition failed: {cond.rule} {cond.args}"
-                    errors.append(msg)
-                    res_entry["error"] = msg
-
-            rule_results.append(res_entry)
-
-        if errors and not force:
-            return t('controller.next.validation_failed') + "\n" + "\n".join([t('controller.next.validation_error', error=e) for e in errors])
-
-        # 4. Success Transition
-        from_stage = self.state.current_stage
-        self.state.current_stage = transition.target
-        self.state.checklist = [] 
-        self.state.save(self.config.state_file)
-        self.engine.set_stage(transition.target)
-        
-        # 5. Record Audit Log
-        self.audit.record_transition(
-            from_stage=from_stage,
-            to_stage=transition.target,
-            module=self.context.data.get('active_module', 'unknown'),
-            results=rule_results,
-            forced=force,
-            reason=reason
-        )
-        
-        if force:
-            result_msg = t('controller.next.success_forced', stage=transition.target)
-        elif skip_conditions:
-            result_msg = t('controller.next.success_skip_conditions', stage=transition.target)
-        else:
-            result_msg = "✅ " + t('controller.next.success', stage=transition.target)
-        return result_msg + "\n" + self.status()
+                result_msg = "✅ " + t('controller.next.success', stage=transition.target)
+            return result_msg + "\n" + self.status(track=track)
+        finally:
+            # Restore engine to global stage if track was used
+            if effective_track and self.state.current_stage in self.config.stages:
+                self.engine.set_stage(self.state.current_stage)
 
     def set_stage(self, stage: str, module: Optional[str] = None, force: bool = False, token: Optional[str] = None) -> str:
         """Manually set the current stage. Requires --force if checklist has unchecked items."""
@@ -975,59 +1140,209 @@ class WorkflowController:
             result += t('controller.set.success_module', module=module)
         return result + "\n" + self.status()
 
-    def set_module(self, module: str) -> str:
+    def set_module(self, module: str, track: Optional[str] = None) -> str:
         """Set active module without changing stage. Does not require --force."""
         if not module or not module.strip():
             return t('controller.module.name_required')
 
-        old_module = self.state.active_module
-        self.state.active_module = module
+        effective_track = self._resolve_track_id(track)
+        if effective_track and effective_track not in self.state.tracks:
+            return t('controller.track.not_found', id=effective_track)
+        effective = self._get_effective_state(track)
+
+        old_module = effective.active_module
+        effective.active_module = module
         self.context.update("active_module", module)
         self.state.save(self.config.state_file)
 
-        self.audit.logger.log_event("MODULE_CHANGE", {
+        log_data = {
             "from_module": old_module,
             "to_module": module,
-            "stage": self.state.current_stage
-        })
+            "stage": effective.current_stage
+        }
+        if effective_track:
+            log_data["track"] = effective_track
+        self.audit.logger.log_event("MODULE_CHANGE", log_data)
 
-        return t('controller.module.changed', old=old_module, new=module) + "\n" + self.status()
+        return t('controller.module.changed', old=old_module, new=module) + "\n" + self.status(track=track)
 
-    def _evaluate_builtin_rule(self, rule: str) -> Optional[bool]:
+    def _evaluate_builtin_rule(self, rule: str, effective: Union[WorkflowState, TrackState] = None) -> Optional[bool]:
         """Evaluate built-in rules that don't require plugin validators.
+
+        Args:
+            effective: The state to evaluate against (track or global).
 
         Returns:
             True/False for built-in rules, None if rule is not built-in.
         """
+        checklist = (effective or self.state).checklist
         if rule == 'all_checked':
-            return all(item.checked for item in self.state.checklist)
+            return all(item.checked for item in checklist)
         elif rule == 'user_approved':
-            for item in self.state.checklist:
+            for item in checklist:
                 if item.text.strip().startswith("[USER-APPROVE]") and not item.checked:
                     return False
             return True
         elif rule == 'all_phases_complete':
-            # Phase completion is determined by user via transition target selection.
-            # If user explicitly targets M4, they assert all phases are done.
             return True
         return None
 
-    def _update_active_status_file(self, checklist_text: str, unchecked_indices: list = None):
-        path = self.config.status_file
+    # ─── Track Management ───
+
+    def track_create(self, track_id: str, label: str, module: str, stage: str = "P1") -> str:
+        """Create a new parallel track."""
+        # Validate track_id format
+        if not re.match(r'^[A-Za-z0-9_-]+$', track_id):
+            return t('controller.track.invalid_id', id=track_id)
+        if track_id in self.state.tracks:
+            return t('controller.track.duplicate_id', id=track_id)
+        if stage not in self.config.stages:
+            valid_stages = list(self.config.stages.keys())
+            return t('controller.track.invalid_stage', stage=stage, valid_stages=valid_stages)
+
+        new_track = TrackState(
+            current_stage=stage,
+            active_module=module,
+            checklist=[],
+            label=label,
+            status="in_progress",
+            created_at=datetime.now().isoformat()
+        )
+        self.state.tracks[track_id] = new_track
+        self.state.save(self.config.state_file)
+
+        self.audit.logger.log_event("TRACK_CREATED", {
+            "track": track_id,
+            "label": label,
+            "module": module,
+            "stage": stage
+        })
+
+        return t('controller.track.created', id=track_id, label=label, stage=stage)
+
+    def track_list(self) -> str:
+        """List all parallel tracks."""
+        if not self.state.tracks:
+            return t('controller.track.no_tracks')
+
+        lines = [t('controller.track.list_header', count=len(self.state.tracks)), "=" * 40]
+        for tid, ts in self.state.tracks.items():
+            active_marker = " *" if tid == self.state.active_track else ""
+            checked = sum(1 for i in ts.checklist if i.checked)
+            total = len(ts.checklist)
+            progress = f"{checked}/{total}" if total > 0 else "0/0"
+            lines.append(f"[{tid}{active_marker}] {ts.label}")
+            lines.append(f"  Stage: {ts.current_stage} | Module: {ts.active_module} | Status: {ts.status}")
+            lines.append(f"  Progress: {progress}")
+            lines.append("")
+
+        if self.state.active_track:
+            lines.append(t('controller.track.active_track', id=self.state.active_track))
+        return "\n".join(lines)
+
+    def track_switch(self, track_id: str) -> str:
+        """Set the default track for the current session."""
+        if track_id not in self.state.tracks:
+            return t('controller.track.not_found', id=track_id)
+
+        self.state.active_track = track_id
+        self.state.save(self.config.state_file)
+
+        self.audit.logger.log_event("TRACK_SWITCH", {"track": track_id})
+        return t('controller.track.switched', id=track_id)
+
+    def track_join(self, force: bool = False, token: Optional[str] = None) -> str:
+        """Join all tracks (clear track data after all complete)."""
+        if not self.state.tracks:
+            return t('controller.track.no_tracks')
+
+        incomplete = [(tid, ts) for tid, ts in self.state.tracks.items() if ts.status != "complete"]
+        if incomplete and not force:
+            lines = [t('controller.track.join_incomplete')]
+            for tid, ts in incomplete:
+                lines.append(f"  [{tid}] {ts.label} — {ts.current_stage} ({ts.status})")
+            lines.append(t('controller.track.join_force_hint'))
+            return "\n".join(lines)
+
+        if force and incomplete:
+            if not token:
+                return t('controller.track.join_token_required')
+            if not verify_token(token):
+                return t('controller.track.join_invalid_token')
+
+        track_ids = list(self.state.tracks.keys())
+        self.state.tracks = {}
+        self.state.active_track = None
+        self.state.save(self.config.state_file)
+
+        self.audit.logger.log_event("TRACKS_JOINED", {"tracks": track_ids, "forced": force})
+        return t('controller.track.joined', tracks=", ".join(track_ids))
+
+    def track_delete(self, track_id: str) -> str:
+        """Delete a specific track."""
+        if track_id not in self.state.tracks:
+            return t('controller.track.not_found', id=track_id)
+
+        del self.state.tracks[track_id]
+        if self.state.active_track == track_id:
+            self.state.active_track = None
+        self.state.save(self.config.state_file)
+
+        self.audit.logger.log_event("TRACK_DELETED", {"track": track_id})
+        return t('controller.track.deleted', id=track_id)
+
+    # ─── End Track Management ───
+
+    def _update_active_status_file(self, checklist_text: str, unchecked_indices: list = None, track_id: Optional[str] = None):
+        track_suffix = f" --track {track_id}" if track_id else ""
+
+        # Determine file path: track-specific or global
+        if track_id:
+            base, ext = os.path.splitext(self.config.status_file)
+            path = f"{base}_{track_id}{ext}"
+        else:
+            path = self.config.status_file
+
         content = f"> **[CURRENT WORKFLOW STATE]**\n"
+        if track_id:
+            content = f"> **[Track {track_id}] WORKFLOW STATE**\n"
         content += f"> Updated at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
         content += ">\n"
         content += f"```markdown\n{checklist_text}\n```\n"
 
         # Add action hints for AI agents
         content += "\n> **⚠️ WORKFLOW RULES (MANDATORY)**\n"
-        content += "> - Use `flow check N` to mark items done (NEVER edit this file manually)\n"
-        content += "> - Use `flow next` when all items are completed\n"
+        content += f"> - Use `flow check N{track_suffix}` to mark items done (NEVER edit this file manually)\n"
+        content += f"> - Use `flow next{track_suffix}` when all items are completed\n"
         if unchecked_indices:
             indices_str = " ".join(map(str, unchecked_indices[:5]))
-            content += f"> - **Next action:** `flow check {indices_str}`\n"
+            content += f"> - **Next action:** `flow check {indices_str}{track_suffix}`\n"
         else:
-            content += "> - **Next action:** `flow next` (all items done!)\n"
+            content += f"> - **Next action:** `flow next{track_suffix}` (all items done!)\n"
+
+        parent_dir = os.path.dirname(path)
+        if parent_dir:
+            os.makedirs(parent_dir, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(content)
+
+        # Also update the global summary file when a track is updated
+        if track_id:
+            self._update_global_status_summary()
+
+    def _update_global_status_summary(self):
+        """Write a summary of all tracks to the global status file."""
+        path = self.config.status_file
+        content = f"> **[WORKFLOW STATE — All Tracks]**\n"
+        content += f"> Updated at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        content += ">\n"
+
+        for tid, ts in self.state.tracks.items():
+            checked = sum(1 for i in ts.checklist if i.checked)
+            total = len(ts.checklist)
+            content += f"> **[{tid}]** {ts.label} — {ts.current_stage} ({checked}/{total})\n"
+
+        content += ">\n> Use `flow status --track <ID>` for details.\n"
 
         parent_dir = os.path.dirname(path)
         if parent_dir:

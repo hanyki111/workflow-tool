@@ -258,6 +258,25 @@ controller:
     name_required: "❌ Error: Module name is required."
     changed: "✅ Module changed: {old} → {new}"
 
+  track:
+    invalid_id: "❌ Error: Invalid track ID '{id}'. Use alphanumeric characters, hyphens, or underscores only."
+    duplicate_id: "❌ Error: Track '{id}' already exists."
+    invalid_stage: "❌ Error: Invalid stage '{stage}'. Valid stages: {valid_stages}"
+    created: "✅ Track '{id}' created (label: {label}, stage: {stage})"
+    no_tracks: "No parallel tracks defined."
+    list_header: "Parallel Tracks: {count}"
+    active_track: "Active track: {id}"
+    not_found: "❌ Error: Track '{id}' not found."
+    switched: "✅ Active track set to '{id}'"
+    join_incomplete: "❌ Cannot join: incomplete tracks remain:"
+    join_force_hint: "Use --force --token YOUR_TOKEN to join anyway."
+    join_token_required: "❌ Error: --force requires USER-APPROVE token."
+    join_invalid_token: "❌ Error: Invalid token for forced join."
+    joined: "✅ All tracks joined and cleared: {tracks}"
+    deleted: "✅ Track '{id}' deleted."
+    completed: "✅ Track '{id}' completed (no more transitions available)."
+    active_warning: "⚠ {count} parallel track(s) active. Use `flow status --all` for details."
+
   review:
     recorded: "✅ Recorded review from agent '{agent}' for stage {stage}."
 
