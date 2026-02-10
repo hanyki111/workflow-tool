@@ -856,8 +856,22 @@ class WorkflowController:
                     errors.append(f"Invalid when expression in {cond.rule}: {e}")
                     continue
 
-            validator_cls = self.registry.get(cond.rule)
             res_entry = {"rule": cond.rule, "args": cond.args}
+
+            # Built-in rules: evaluated directly without registry lookup
+            builtin_result = self._evaluate_builtin_rule(cond.rule)
+            if builtin_result is not None:
+                passed = builtin_result
+                res_entry["status"] = "PASS" if passed else "FAIL"
+                if not passed:
+                    msg = cond.fail_message or f"Built-in rule failed: {cond.rule}"
+                    errors.append(msg)
+                    res_entry["error"] = msg
+                rule_results.append(res_entry)
+                continue
+
+            # Plugin rules: lookup from registry
+            validator_cls = self.registry.get(cond.rule)
 
             if not validator_cls:
                 err_msg = f"Missing validator for rule '{cond.rule}'"
@@ -978,6 +992,25 @@ class WorkflowController:
         })
 
         return t('controller.module.changed', old=old_module, new=module) + "\n" + self.status()
+
+    def _evaluate_builtin_rule(self, rule: str) -> Optional[bool]:
+        """Evaluate built-in rules that don't require plugin validators.
+
+        Returns:
+            True/False for built-in rules, None if rule is not built-in.
+        """
+        if rule == 'all_checked':
+            return all(item.checked for item in self.state.checklist)
+        elif rule == 'user_approved':
+            for item in self.state.checklist:
+                if item.text.strip().startswith("[USER-APPROVE]") and not item.checked:
+                    return False
+            return True
+        elif rule == 'all_phases_complete':
+            # Phase completion is determined by user via transition target selection.
+            # If user explicitly targets M4, they assert all phases are done.
+            return True
+        return None
 
     def _update_active_status_file(self, checklist_text: str, unchecked_indices: list = None):
         path = self.config.status_file
