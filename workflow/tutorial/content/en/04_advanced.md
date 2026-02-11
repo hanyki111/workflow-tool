@@ -630,4 +630,132 @@ Both features work with Ralph Loop:
 
 On failure, Ralph prompt shows file content for debugging.
 
+## Parallel Tracks
+
+Run multiple workflow branches concurrently. Each track has its own stage, module, and checklist.
+
+### Creating and Managing Tracks
+
+```bash
+# Create parallel tracks
+flow track create --id feat-auth --label "Authentication" --module auth
+flow track create --id feat-api --label "API Layer" --module api
+
+# List all tracks
+flow track list
+# Output:
+# Parallel Tracks: 2
+# Active track: feat-auth
+#   feat-auth: P1 (in_progress) - Authentication [auth]
+#   feat-api: P1 (in_progress) - API Layer [api]
+
+# Switch active track
+flow track switch feat-api
+
+# Use --track flag with any command
+flow check 1 2 --track feat-auth
+flow status --track feat-auth
+flow next --track feat-auth
+```
+
+### Track Lifecycle
+
+```
+Create → Work (check/next) → Complete → Join
+```
+
+1. **Create**: `flow track create --id X --label Y --module Z`
+2. **Work**: Use `flow track switch` or `--track` flag
+3. **Complete**: Track completes when no more transitions available
+4. **Join**: `flow track join` merges all completed tracks
+
+```bash
+# Join when all tracks are complete
+flow track join
+
+# Force join (even with incomplete tracks)
+flow track join --force --token "your-secret"
+
+# Delete a specific track
+flow track delete feat-auth
+```
+
+## Phase DAG (Automatic Parallel Routing)
+
+Define phase dependencies as a DAG. The engine automatically routes transitions through Fork/Join patterns.
+
+### Setup
+
+```yaml
+# workflow.yaml - Enable phase cycle
+phase_cycle:
+  start: "P1"    # First stage in cycle
+  end: "P7"      # Last stage in cycle
+```
+
+### Defining Phases
+
+```bash
+# Add phases (order doesn't matter - dependencies define the DAG)
+flow phase add --id auth --label "Authentication" --module auth
+flow phase add --id api --label "API Layer" --module api --depends-on auth
+flow phase add --id ui --label "UI Components" --module ui --depends-on auth
+flow phase add --id deploy --label "Deploy" --module deploy --depends-on api,ui
+
+# View the DAG
+flow phase graph
+# Output:
+# Phase DAG (4 phases, 3 levels):
+# Level 0: auth (Authentication) [pending]
+# Level 1: api (API Layer) [pending], ui (UI Components) [pending]
+# Level 2: deploy (Deploy) [pending]
+
+# Remove a phase
+flow phase remove --id deploy
+```
+
+### How Auto-Routing Works
+
+When you complete a phase cycle (P7 -> P1) with a Phase DAG active:
+
+```
+                    ┌─────────────────────────────────────┐
+                    │         Phase DAG Example            │
+                    │                                      │
+                    │   auth ──► api ──► deploy            │
+                    │     └───► ui  ──┘                    │
+                    └─────────────────────────────────────┘
+
+Step 1: auth completes P7 → P1
+        Engine sees api + ui are available (no remaining deps)
+        → FORK: creates auto-api and auto-ui tracks
+
+Step 2: api completes P7 → P1
+        Engine sees deploy depends on api + ui
+        ui still running → WAIT
+
+Step 3: ui completes P7 → P1
+        Engine sees deploy is now available (api + ui done)
+        → SEQUENTIAL: advances to deploy
+
+Step 4: deploy completes P7
+        All phases complete → allows `flow next M4`
+```
+
+**Transition types:**
+
+| Type | Condition | Result |
+|------|-----------|--------|
+| Sequential | 1 phase available | Advance directly |
+| Fork | 2+ phases available | Create auto-tracks |
+| Wait | Phase done, siblings pending | Wait message |
+| Complete | All phases done | Allow milestone transition |
+
+### Auto-Track Naming
+
+Auto-created tracks follow the pattern `auto-<phase-id>`:
+- Phase `auth` → track `auto-auth`
+- Phase `api` → track `auto-api`
+- Collision: `auto-api-2`, `auto-api-3`, etc.
+
 Next: Best practices and tips!

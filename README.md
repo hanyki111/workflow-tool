@@ -53,16 +53,16 @@ The AI Workflow Engine solves these by:
 ┌─────────────────────────────────────────────────────────────┐
 │                        CLI (flow)                           │
 ├─────────────────────────────────────────────────────────────┤
-│  Commands: status | next | check | set | review | tutorial  │
+│  Commands: status | next | check | track | phase | review   │
 └─────────────────────────────┬───────────────────────────────┘
                               │
 ┌─────────────────────────────▼───────────────────────────────┐
 │                      Core Engine                             │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
-│  │ Controller  │  │    State    │  │      Loader         │  │
-│  │ (Workflow   │  │ (JSON       │  │ (YAML config        │  │
-│  │  logic)     │  │  persist)   │  │  parsing)           │  │
-│  └─────────────┘  └─────────────┘  └─────────────────────┘  │
+│  ┌────────────┐ ┌──────────┐ ┌──────────┐ ┌────────────┐  │
+│  │ Controller │ │  State   │ │ Scheduler│ │   Loader   │  │
+│  │ (Workflow  │ │ (JSON    │ │ (Phase   │ │ (YAML      │  │
+│  │  logic)    │ │  persist)│ │  DAG)    │ │  config)   │  │
+│  └────────────┘ └──────────┘ └──────────┘ └────────────┘  │
 └─────────────────────────────┬───────────────────────────────┘
                               │
 ┌─────────────────────────────▼───────────────────────────────┐
@@ -86,6 +86,8 @@ The AI Workflow Engine solves these by:
 | **Plugin System**        | Extensible validators for custom conditions                       |
 | **State Persistence**    | JSON-based state tracking across sessions                         |
 | **Audit Logging**        | All actions are logged for accountability                         |
+| **Parallel Tracks**      | Run multiple workflow branches concurrently with `flow track`     |
+| **Phase DAG**            | Define phase dependency graphs with automatic Fork/Join routing   |
 
 ### AI Integration Features
 
@@ -304,6 +306,11 @@ audit_dir: ".workflow/audit"           # Audit log directory
 status_file: ".workflow/ACTIVE_STATUS.md"  # AI status hook file
 guide_file: "docs/WORKFLOW_GUIDE.md"   # Guide file for checklist sync (optional)
 
+# Phase cycle definition (optional, enables Phase DAG auto-routing)
+phase_cycle:
+  start: "P1"   # First stage in phase cycle
+  end: "P7"     # Last stage in phase cycle
+
 # Reusable condition sets (optional)
 rulesets:
   all_checked:
@@ -377,7 +384,23 @@ stages:
       "evidence": null,
       "required_agent": null
     }
-  ]
+  ],
+  "tracks": {
+    "auto-auth": {
+      "current_stage": "P4",
+      "active_module": "auth",
+      "checklist": [],
+      "label": "Authentication",
+      "status": "in_progress",
+      "phase_id": "auth",
+      "created_by": "auto"
+    }
+  },
+  "active_track": "auto-auth",
+  "phase_graph": {
+    "auth": {"id": "auth", "label": "Authentication", "module": "auth", "depends_on": [], "status": "active"},
+    "api": {"id": "api", "label": "API Layer", "module": "api", "depends_on": ["auth"], "status": "pending"}
+  }
 }
 ```
 
@@ -616,12 +639,103 @@ flow module set inventory-system
 # - Working on different module without resetting checklist
 ```
 
+### `flow track`
+
+Manage parallel workflow tracks for concurrent development.
+
+```bash
+# Create a parallel track
+flow track create --id feat-auth --label "Authentication" --module auth
+
+# Create with specific starting stage
+flow track create --id feat-api --label "API Layer" --module api --stage P1
+
+# List all tracks
+flow track list
+
+# Switch active track
+flow track switch feat-auth
+
+# Use --track flag with any command
+flow check 1 2 --track feat-auth
+flow status --track feat-auth
+flow next --track feat-auth
+
+# Join all completed tracks
+flow track join
+
+# Force join (even with incomplete tracks)
+flow track join --force --token "your-secret"
+
+# Delete a track
+flow track delete feat-auth
+```
+
+**Track-Scoped Commands:**
+
+Most commands accept `--track <id>` to operate on a specific track:
+
+| Command | With --track |
+|---------|-------------|
+| `flow status` | Shows track's stage and checklist |
+| `flow check` | Checks items in the track |
+| `flow next` | Advances the track's stage |
+| `flow review` | Records review for the track |
+
+### `flow phase`
+
+Manage Phase DAG (Directed Acyclic Graph) for automatic parallel routing.
+
+```bash
+# Add phases with dependencies
+flow phase add --id auth --label "Authentication" --module auth
+flow phase add --id api --label "API Layer" --module api --depends-on auth
+flow phase add --id ui --label "UI Components" --module ui --depends-on auth
+
+# View DAG as list
+flow phase list
+
+# View DAG level visualization
+flow phase graph
+# Output:
+# Phase DAG (3 phases, 2 levels):
+# Level 0: auth (Authentication) [pending]
+# Level 1: api (API Layer) [pending], ui (UI Components) [pending]
+
+# Remove a phase
+flow phase remove --id ui
+```
+
+**How Phase DAG Auto-Routing Works:**
+
+When `phase_cycle` is configured in `workflow.yaml` and phases are defined:
+
+1. On `flow next` at cycle end (e.g., P7 -> P1), the engine checks available phases
+2. **Sequential**: One available phase -> advances to it automatically
+3. **Fork**: Multiple available phases -> creates auto-tracks for parallel execution
+4. **Join/Wait**: Phase complete but siblings still running -> waits
+5. **All Complete**: All phases done -> allows milestone transition (e.g., P7 -> M4)
+
+```yaml
+# workflow.yaml - Enable Phase DAG routing
+phase_cycle:
+  start: "P1"
+  end: "P7"
+
+# Then define phases at runtime:
+# flow phase add --id auth --label "Auth" --module auth
+# flow phase add --id api --label "API" --module api --depends-on auth
+```
+
 ### `flow review`
 
 Record sub-agent review results.
 
 ```bash
 flow review --agent "code-reviewer" --summary "All SOLID principles followed, no blocking issues found"
+
+# Record review for a specific track
+flow review --agent "code-reviewer" --summary "Review passed" --track feat-auth
 
 # This creates an audit log entry that can be verified later
 ```
@@ -801,7 +915,67 @@ The flow between stages is defined by `transitions` in workflow.yaml:
 │                        └─────── repeats ──────┘              │
 │                                                              │
 └─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│           EXAMPLE: PHASE DAG (PARALLEL EXECUTION)            │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│   Phase DAG:    auth ──► api ──► deploy                      │
+│                   └───► ui  ──┘                              │
+│                                                              │
+│   Execution:  [auth] → Fork → [api] + [ui] → Join → [deploy]│
+│               (each phase runs P1→P7 cycle independently)    │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
 ```
+
+### Parallel Tracks
+
+Run multiple workflow branches concurrently. Each track maintains its own stage, module, and checklist independently.
+
+**Manual tracks** (created with `flow track create`):
+```bash
+flow track create --id feat-auth --label "Auth Module" --module auth
+flow track create --id feat-api --label "API Module" --module api
+flow track switch feat-auth    # Work on auth
+flow check 1 2 3               # Check items in auth track
+flow track switch feat-api     # Switch to api
+flow next                      # Advance api track
+flow track join                # Merge when all complete
+```
+
+**Auto-tracks** (created by Phase DAG):
+When a Phase DAG is active and multiple phases can run in parallel, the engine automatically creates tracks (named `auto-<phase-id>`) and routes work through them.
+
+### Phase DAG
+
+Define phase dependencies as a Directed Acyclic Graph. The engine automatically routes transitions through the DAG when completing phase cycles.
+
+**Setup:**
+```yaml
+# 1. Define phase cycle in workflow.yaml
+phase_cycle:
+  start: "P1"
+  end: "P7"
+```
+
+```bash
+# 2. Add phases at runtime
+flow phase add --id auth --label "Authentication" --module auth
+flow phase add --id api --label "API" --module api --depends-on auth
+flow phase add --id ui --label "UI" --module ui --depends-on auth
+flow phase add --id deploy --label "Deploy" --module deploy --depends-on api,ui
+```
+
+**Auto-routing behavior:**
+
+| Scenario | What happens |
+|----------|-------------|
+| Single available phase | Advances to it (sequential) |
+| Multiple available phases | Creates auto-tracks (fork) |
+| Phase complete, siblings running | Waits with status message |
+| All siblings complete | Advances to next phase(s) |
+| All phases complete | Allows milestone transition |
 
 ### Checklists
 
@@ -1691,8 +1865,9 @@ workflow-tool/
 │   ├── __main__.py         # Entry point
 │   ├── cli.py              # CLI commands
 │   ├── core/               # Core engine
-│   │   ├── controller.py   # Main logic
-│   │   ├── state.py        # State management
+│   │   ├── controller.py   # Main logic (tracks, phases, transitions)
+│   │   ├── state.py        # State management (tracks, phase_graph)
+│   │   ├── scheduler.py    # Phase DAG scheduler (Fork/Join)
 │   │   ├── schema.py       # Data classes
 │   │   ├── validator.py    # Base validator
 │   │   ├── loader.py       # Config loading

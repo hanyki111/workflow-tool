@@ -630,4 +630,132 @@ checklist:
 
 실패 시 Ralph 프롬프트에 디버깅을 위한 파일 내용이 표시됩니다.
 
+## 병렬 Track
+
+여러 워크플로우 브랜치를 동시에 실행합니다. 각 Track은 독립적인 스테이지, 모듈, 체크리스트를 가집니다.
+
+### Track 생성 및 관리
+
+```bash
+# 병렬 Track 생성
+flow track create --id feat-auth --label "인증" --module auth
+flow track create --id feat-api --label "API 레이어" --module api
+
+# 모든 Track 목록
+flow track list
+# 출력:
+# 병렬 Track: 2개
+# 활성 Track: feat-auth
+#   feat-auth: P1 (in_progress) - 인증 [auth]
+#   feat-api: P1 (in_progress) - API 레이어 [api]
+
+# 활성 Track 전환
+flow track switch feat-api
+
+# --track 플래그로 특정 Track 대상 명령
+flow check 1 2 --track feat-auth
+flow status --track feat-auth
+flow next --track feat-auth
+```
+
+### Track 생명주기
+
+```
+생성 → 작업 (check/next) → 완료 → 합류
+```
+
+1. **생성**: `flow track create --id X --label Y --module Z`
+2. **작업**: `flow track switch` 또는 `--track` 플래그 사용
+3. **완료**: 더 이상 전이할 스테이지가 없으면 완료
+4. **합류**: `flow track join`으로 모든 완료 Track 합류
+
+```bash
+# 모든 Track 완료 시 합류
+flow track join
+
+# 강제 합류 (미완료 Track이 있어도)
+flow track join --force --token "your-secret"
+
+# 특정 Track 삭제
+flow track delete feat-auth
+```
+
+## Phase DAG (자동 병렬 라우팅)
+
+Phase 의존성을 DAG로 정의합니다. 엔진이 Fork/Join 패턴으로 자동 전이합니다.
+
+### 설정
+
+```yaml
+# workflow.yaml - Phase 사이클 활성화
+phase_cycle:
+  start: "P1"    # 사이클 시작 스테이지
+  end: "P7"      # 사이클 종료 스테이지
+```
+
+### Phase 정의
+
+```bash
+# Phase 추가 (순서 무관 - 의존성이 DAG를 결정)
+flow phase add --id auth --label "인증" --module auth
+flow phase add --id api --label "API 레이어" --module api --depends-on auth
+flow phase add --id ui --label "UI 컴포넌트" --module ui --depends-on auth
+flow phase add --id deploy --label "배포" --module deploy --depends-on api,ui
+
+# DAG 시각화
+flow phase graph
+# 출력:
+# Phase DAG (4개 Phase, 3개 레벨):
+# Level 0: auth (인증) [pending]
+# Level 1: api (API 레이어) [pending], ui (UI 컴포넌트) [pending]
+# Level 2: deploy (배포) [pending]
+
+# Phase 제거
+flow phase remove --id deploy
+```
+
+### 자동 라우팅 동작 방식
+
+Phase DAG가 활성화된 상태에서 Phase 사이클을 완료(P7 → P1)하면:
+
+```
+                    ┌─────────────────────────────────────┐
+                    │         Phase DAG 예시               │
+                    │                                      │
+                    │   auth ──► api ──► deploy            │
+                    │     └───► ui  ──┘                    │
+                    └─────────────────────────────────────┘
+
+단계 1: auth가 P7 → P1 완료
+        엔진이 api + ui 사용 가능 확인 (의존성 해소)
+        → FORK: auto-api, auto-ui 트랙 자동 생성
+
+단계 2: api가 P7 → P1 완료
+        엔진이 deploy는 api + ui에 의존 확인
+        ui 아직 실행 중 → WAIT (대기)
+
+단계 3: ui가 P7 → P1 완료
+        엔진이 deploy 사용 가능 확인 (api + ui 완료)
+        → SEQUENTIAL: deploy로 진행
+
+단계 4: deploy가 P7 완료
+        모든 Phase 완료 → `flow next M4` 허용
+```
+
+**전이 유형:**
+
+| 유형 | 조건 | 결과 |
+|------|------|------|
+| Sequential | 1개 Phase 사용 가능 | 직접 진행 |
+| Fork | 2개+ Phase 사용 가능 | auto-track 생성 |
+| Wait | Phase 완료, 형제 Phase 진행 중 | 대기 메시지 |
+| Complete | 모든 Phase 완료 | 마일스톤 전이 허용 |
+
+### Auto-Track 네이밍
+
+자동 생성 Track은 `auto-<phase-id>` 패턴:
+- Phase `auth` → track `auto-auth`
+- Phase `api` → track `auto-api`
+- 충돌 시: `auto-api-2`, `auto-api-3` 등
+
 다음: 모범 사례와 팁!

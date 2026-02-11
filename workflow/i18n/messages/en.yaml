@@ -86,6 +86,7 @@ help:
     description: "Record sub-agent review"
     agent: "Agent name (e.g., spec-validator)"
     summary: "Summary of the review findings"
+    track: "Target track ID (records review for specific track)"
 
   module:
     description: "Module management commands"
