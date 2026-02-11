@@ -1053,13 +1053,21 @@ class WorkflowController:
             if errors and not force:
                 return t('controller.next.validation_failed') + "\n" + "\n".join([t('controller.next.validation_error', error=e) for e in errors])
 
-            # 4. Success Transition
+            # Phase transition hook: intercept cycle boundary transitions
             from_stage = effective.current_stage
+            if (self.config.phase_cycle
+                    and self.state.phase_graph
+                    and transition.target == self.config.phase_cycle.start
+                    and (from_stage == self.config.phase_cycle.end
+                         or self._has_no_active_phase())):
+                return self._handle_phase_transition(effective_track, transition.target)
+
+            # 4. Success Transition
             effective.current_stage = transition.target
             effective.checklist = []
 
             # Phase graph cleanup on cycle exit (e.g., P7 → M4)
-            # Depends on Phase 4.2 hook intercepting P7→P1 for auto-tracks
+            # Hook above intercepts P7→P1 for DAG routing; this handles P7→M4
             if (self.config.phase_cycle
                     and self.state.phase_graph
                     and from_stage == self.config.phase_cycle.end
@@ -1221,6 +1229,150 @@ class WorkflowController:
             from .scheduler import PhaseScheduler
             return PhaseScheduler.is_all_complete(self.state.phase_graph)
         return None
+
+    # ─── Phase DAG Transition ───
+
+    def _has_no_active_phase(self) -> bool:
+        """Check if no phase is currently active (initial entry detection)."""
+        if self.state.current_phase:
+            return False
+        auto_in_progress = [ts for ts in self.state.tracks.values()
+                            if ts.created_by == "auto" and ts.status == "in_progress"]
+        return len(auto_in_progress) == 0
+
+    def _resolve_current_phase(self, track_id: Optional[str]) -> Optional[str]:
+        """Resolve current phase ID from track or global state."""
+        if track_id and track_id in self.state.tracks:
+            return self.state.tracks[track_id].phase_id
+        return self.state.current_phase or None
+
+    def _cleanup_completed_auto_tracks(self):
+        """Remove auto-created tracks that are complete."""
+        to_remove = [tid for tid, ts in self.state.tracks.items()
+                     if ts.created_by == "auto" and ts.status == "complete"]
+        for tid in to_remove:
+            del self.state.tracks[tid]
+        if self.state.active_track and self.state.active_track not in self.state.tracks:
+            self.state.active_track = None
+
+    def _advance_to_phase(self, phase, target_stage: str) -> str:
+        """Advance to a single phase in global state (sequential path)."""
+        from .scheduler import PhaseScheduler
+        PhaseScheduler.mark_active(self.state.phase_graph, phase.id)
+        self.state.current_phase = phase.id
+        self.state.current_stage = target_stage
+        self.state.active_module = phase.module
+        self.state.checklist = []
+        # Sequential path: no track active (active_track cleared by cleanup)
+        self.state.active_track = None
+        self.engine.set_stage(target_stage)
+        self.context.update("active_module", phase.module)
+        return t('controller.phase_transition.sequential',
+                 phase_id=phase.id, phase_label=phase.label,
+                 module=phase.module) + "\n" + self.status()
+
+    def _fork_to_phases(self, available: list, target_stage: str) -> str:
+        """Create auto-tracks for parallel phases (fork)."""
+        from .scheduler import PhaseScheduler
+        created = []
+        for phase in available:
+            track_id = f"auto-{phase.id}"
+            suffix = 2
+            while track_id in self.state.tracks:
+                track_id = f"auto-{phase.id}-{suffix}"
+                suffix += 1
+            PhaseScheduler.mark_active(self.state.phase_graph, phase.id)
+            new_track = TrackState(
+                current_stage=target_stage,
+                active_module=phase.module,
+                checklist=[],
+                label=phase.label,
+                status="in_progress",
+                created_at=datetime.now().isoformat(),
+                phase_id=phase.id,
+                created_by="auto"
+            )
+            self.state.tracks[track_id] = new_track
+            created.append((track_id, phase))
+
+        if created:
+            self.state.active_track = created[0][0]
+        self.state.current_stage = target_stage
+        self.state.current_phase = ""
+        self.state.checklist = []
+        self.engine.set_stage(target_stage)
+        track_info = ", ".join([f"{tid} ({p.label})" for tid, p in created])
+        return t('controller.phase_transition.fork',
+                 count=len(created), tracks=track_info,
+                 stage=target_stage) + "\n" + self.track_list()
+
+    def _handle_phase_transition(self, track_id: Optional[str], target_stage: str) -> str:
+        """Handle DAG-based phase transition on cycle boundary."""
+        from .scheduler import PhaseScheduler
+        graph = self.state.phase_graph
+
+        # 1. Mark current phase complete (if active)
+        current_phase_id = self._resolve_current_phase(track_id)
+        if current_phase_id:
+            node = graph.get(current_phase_id)
+            if node and node.status == "active":
+                PhaseScheduler.mark_complete(graph, current_phase_id)
+
+        # 2. Get available phases
+        available = PhaseScheduler.get_available(graph)
+
+        # 3. Mark current auto-track as complete
+        if track_id and track_id in self.state.tracks:
+            ts = self.state.tracks[track_id]
+            if ts.created_by == "auto":
+                ts.status = "complete"
+
+        # 4. Branch
+        if not available:
+            if PhaseScheduler.is_all_complete(graph):
+                self._cleanup_completed_auto_tracks()
+                self.state.current_phase = ""
+                self.state.active_track = None
+                self.state.save(self.config.state_file)
+                self._audit_phase_transition("ALL_COMPLETE", track_id,
+                    phase_id=current_phase_id)
+                return t('controller.phase_transition.all_complete')
+            else:
+                # Waiting — completed track stays visible (PRD 2.3)
+                self.state.save(self.config.state_file)
+                self._audit_phase_transition("WAITING", track_id,
+                    phase_id=current_phase_id)
+                return t('controller.phase_transition.waiting')
+
+        # Cleanup completed auto-tracks before creating new state
+        self._cleanup_completed_auto_tracks()
+
+        if len(available) == 1:
+            result = self._advance_to_phase(available[0], target_stage)
+        else:
+            result = self._fork_to_phases(available, target_stage)
+
+        self.state.save(self.config.state_file)
+        self._audit_phase_transition(
+            "SEQUENTIAL" if len(available) == 1 else "FORK",
+            track_id,
+            phase_id=current_phase_id,
+            new_phases=[p.id for p in available])
+        return result
+
+    def _audit_phase_transition(self, transition_type: str,
+                                track_id: Optional[str] = None,
+                                phase_id: Optional[str] = None,
+                                new_phases: Optional[list] = None):
+        """Record phase transition audit event."""
+        data = {"type": transition_type}
+        if track_id:
+            data["from_track"] = track_id
+        if phase_id:
+            data["completed_phase"] = phase_id
+        if new_phases:
+            data["new_phases"] = new_phases
+        self.audit.logger.log_event("PHASE_TRANSITION", data)
 
     # ─── Track Management ───
 

@@ -318,6 +318,12 @@ controller:
     graph_header: "Phase DAG ({count}개 Phase, {levels}개 레벨):"
     graph_error: "❌ DAG 오류: {error}"
 
+  phase_transition:
+    sequential: "🔄 Phase '{phase_id}' ({phase_label}) 시작. 모듈: {module}"
+    fork: "🔀 Fork: {count}개 병렬 Phase 시작 ({tracks}). {stage}에서 시작."
+    waiting: "⏳ Phase 완료. 다른 병렬 Phase 완료 대기 중. `flow track list`로 상태 확인."
+    all_complete: "✅ 모든 Phase 완료! 마일스톤 종료로 진행: `flow next M4`"
+
   review:
     recorded: "✅ 스테이지 {stage}에서 에이전트 '{agent}'의 리뷰가 기록되었습니다."
 

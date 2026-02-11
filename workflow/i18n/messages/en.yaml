@@ -318,6 +318,12 @@ controller:
     graph_header: "Phase DAG ({count} phases, {levels} levels):"
     graph_error: "❌ DAG error: {error}"
 
+  phase_transition:
+    sequential: "🔄 Phase '{phase_id}' ({phase_label}) started. Module: {module}"
+    fork: "🔀 Fork: {count} parallel phases created ({tracks}). Starting at {stage}."
+    waiting: "⏳ Phase complete. Waiting for other parallel phases. Use `flow track list` to see status."
+    all_complete: "✅ All phases complete! Proceed to milestone close: `flow next M4`"
+
   review:
     recorded: "✅ Recorded review from agent '{agent}' for stage {stage}."
 
