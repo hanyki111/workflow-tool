@@ -133,6 +133,17 @@ help:
     track_option: "대상 Track ID (활성 Track보다 우선)"
     all_option: "모든 Track 요약 표시"
 
+  phase:
+    description: "Phase DAG 관리 명령어"
+    add: "DAG에 Phase 노드 추가"
+    id: "Phase 식별자"
+    label: "Phase 이름 (사람이 읽을 수 있는)"
+    module: "Phase의 모듈 이름"
+    depends_on: "쉼표로 구분된 의존 Phase ID"
+    list: "모든 Phase 노드와 상태 표시"
+    graph: "DAG 레벨 시각화"
+    remove: "DAG에서 Phase 노드 제거"
+
   install_wrappers:
     description: "워크플로우 자동 통합을 위한 쉘 래퍼 생성"
     shell: "대상 쉘 (bash, zsh, powershell, fish, auto)"
@@ -293,6 +304,19 @@ controller:
     completed: "✅ Track '{id}' 완료 (더 이상 전이할 스테이지가 없습니다)."
     active_warning: "⚠ {count}개의 병렬 Track이 활성 상태입니다. `flow status --all`로 확인하세요."
 
+  phase:
+    added: "✅ Phase '{id}' 추가됨: {label} (모듈: {module})"
+    duplicate_id: "❌ 오류: Phase '{id}'이(가) 이미 그래프에 존재합니다."
+    invalid_dependency: "❌ 오류: 의존성 '{dep}'이(가) 그래프에 존재하지 않습니다."
+    cycle_detected: "❌ 오류: Phase '{id}' 추가 시 잘못된 DAG 생성: {error}"
+    removed: "✅ Phase '{id}'이(가) 그래프에서 제거됨."
+    has_dependents: "❌ 오류: Phase '{id}' 제거 불가: {dependents}이(가) 의존 중"
+    not_found: "❌ 오류: Phase '{id}'이(가) 그래프에 없습니다."
+    no_phases: "정의된 Phase가 없습니다. `flow phase add`로 생성하세요."
+    list_header: "Phase DAG ({count}개 Phase):"
+    graph_header: "Phase DAG ({count}개 Phase, {levels}개 레벨):"
+    graph_error: "❌ DAG 오류: {error}"
+
   review:
     recorded: "✅ 스테이지 {stage}에서 에이전트 '{agent}'의 리뷰가 기록되었습니다."
 
@@ -344,6 +368,7 @@ cli:
   check_error: "❌ 오류: 인덱스 또는 --tag가 필요합니다"
   module_usage: "사용법: flow module set <name>"
   track_usage: "사용법: flow track <create|list|switch|join|delete>"
+  phase_usage: "사용법: flow phase <add|list|graph|remove>"
   alias:
     no_config: "쉘 설정 파일(.zshrc, .bashrc)을 찾을 수 없습니다."
     add_manually: "다음 줄을 수동으로 추가하세요:\n  {line}"

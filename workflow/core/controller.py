@@ -1311,6 +1311,95 @@ class WorkflowController:
 
     # ─── End Track Management ───
 
+    # ─── Phase DAG Management ───
+
+    def phase_add(self, phase_id: str, label: str, module: str,
+                  depends_on: Optional[List[str]] = None) -> str:
+        """Add a phase node to the DAG."""
+        from .state import PhaseNode
+        from .scheduler import PhaseScheduler
+
+        graph = self.state.phase_graph
+
+        # Duplicate check
+        if phase_id in graph:
+            return t('controller.phase.duplicate_id', id=phase_id)
+
+        # Dependency existence check
+        deps = depends_on or []
+        for dep in deps:
+            if dep not in graph:
+                return t('controller.phase.invalid_dependency', dep=dep)
+
+        # Create node and validate DAG
+        node = PhaseNode(id=phase_id, label=label, module=module, depends_on=deps)
+        graph[phase_id] = node
+        errors = PhaseScheduler.validate_dag(graph)
+        if errors:
+            del graph[phase_id]
+            return t('controller.phase.cycle_detected', id=phase_id, error=errors[0])
+
+        self.state.save(self.config.state_file)
+        self.audit.logger.log_event("PHASE_ADDED", {
+            "phase_id": phase_id, "label": label,
+            "module": module, "depends_on": deps,
+        })
+        return t('controller.phase.added', id=phase_id, label=label, module=module)
+
+    def phase_list(self) -> str:
+        """List all phase nodes with status."""
+        graph = self.state.phase_graph
+        if not graph:
+            return t('controller.phase.no_phases')
+
+        lines = [t('controller.phase.list_header', count=len(graph)), "=" * 40]
+        for pid in sorted(graph.keys()):
+            node = graph[pid]
+            deps_str = f" [depends_on: {', '.join(node.depends_on)}]" if node.depends_on else ""
+            lines.append(f"[{pid}] {node.label} ({node.module}) — {node.status}{deps_str}")
+        return "\n".join(lines)
+
+    def phase_graph(self) -> str:
+        """Show DAG level visualization."""
+        from .scheduler import PhaseScheduler
+
+        graph = self.state.phase_graph
+        if not graph:
+            return t('controller.phase.no_phases')
+
+        try:
+            levels = PhaseScheduler.get_execution_order(graph)
+        except ValueError as e:
+            return t('controller.phase.graph_error', error=str(e))
+
+        lines = [t('controller.phase.graph_header', count=len(graph), levels=len(levels))]
+        for i, group in enumerate(levels):
+            items = []
+            for pid in group:
+                node = graph[pid]
+                items.append(f"[{pid}] {node.label} ({node.status})")
+            lines.append(f"Level {i}: {', '.join(items)}")
+        return "\n".join(lines)
+
+    def phase_remove(self, phase_id: str) -> str:
+        """Remove a phase node from the DAG."""
+        graph = self.state.phase_graph
+
+        if phase_id not in graph:
+            return t('controller.phase.not_found', id=phase_id)
+
+        # Check for dependents
+        dependents = [pid for pid, node in graph.items() if phase_id in node.depends_on]
+        if dependents:
+            return t('controller.phase.has_dependents', id=phase_id, dependents=", ".join(dependents))
+
+        del graph[phase_id]
+        self.state.save(self.config.state_file)
+        self.audit.logger.log_event("PHASE_REMOVED", {"phase_id": phase_id})
+        return t('controller.phase.removed', id=phase_id)
+
+    # ─── End Phase DAG Management ───
+
     def _update_active_status_file(self, checklist_text: str, unchecked_indices: list = None, track_id: Optional[str] = None):
         track_suffix = f" --track {track_id}" if track_id else ""
 

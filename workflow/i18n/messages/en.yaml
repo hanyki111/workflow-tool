@@ -133,6 +133,17 @@ help:
     track_option: "Target track ID (overrides active track)"
     all_option: "Show all tracks summary"
 
+  phase:
+    description: "Phase DAG management commands"
+    add: "Add a phase node to the DAG"
+    id: "Phase identifier"
+    label: "Human-readable label for the phase"
+    module: "Module name for the phase"
+    depends_on: "Comma-separated dependency phase IDs"
+    list: "List all phase nodes with status"
+    graph: "Show DAG level visualization"
+    remove: "Remove a phase node from the DAG"
+
   install_wrappers:
     description: "Generate shell wrappers for automatic workflow integration"
     shell: "Target shell (bash, zsh, powershell, fish, auto)"
@@ -293,6 +304,19 @@ controller:
     completed: "✅ Track '{id}' completed (no more transitions available)."
     active_warning: "⚠ {count} parallel track(s) active. Use `flow status --all` for details."
 
+  phase:
+    added: "✅ Phase '{id}' added: {label} (module: {module})"
+    duplicate_id: "❌ Error: Phase '{id}' already exists in graph."
+    invalid_dependency: "❌ Error: Dependency '{dep}' does not exist in graph."
+    cycle_detected: "❌ Error: Adding phase '{id}' would create invalid DAG: {error}"
+    removed: "✅ Phase '{id}' removed from graph."
+    has_dependents: "❌ Error: Cannot remove phase '{id}': depended on by {dependents}"
+    not_found: "❌ Error: Phase '{id}' not found in graph."
+    no_phases: "No phases defined. Use `flow phase add` to create."
+    list_header: "Phase DAG ({count} phases):"
+    graph_header: "Phase DAG ({count} phases, {levels} levels):"
+    graph_error: "❌ DAG error: {error}"
+
   review:
     recorded: "✅ Recorded review from agent '{agent}' for stage {stage}."
 
@@ -344,6 +368,7 @@ cli:
   check_error: "❌ Error: Either indices or --tag is required"
   module_usage: "Usage: flow module set <name>"
   track_usage: "Usage: flow track <create|list|switch|join|delete>"
+  phase_usage: "Usage: flow phase <add|list|graph|remove>"
   alias:
     no_config: "Could not find shell config file (.zshrc, .bashrc)."
     add_manually: "Please add this line manually:\n  {line}"

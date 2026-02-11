@@ -54,6 +54,28 @@ class CheckItem:
     require_args: bool = False    # Whether action requires --args
 
 @dataclass
+class PhaseNode:
+    """마일스톤 Phase DAG의 노드."""
+    id: str
+    label: str
+    module: str
+    depends_on: List[str] = field(default_factory=list)
+    status: str = "pending"  # "pending" | "active" | "complete"
+
+    def to_dict(self) -> Dict:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: Dict) -> 'PhaseNode':
+        return cls(
+            id=data.get('id', ""),
+            label=data.get('label', ""),
+            module=data.get('module', ""),
+            depends_on=data.get('depends_on', []),
+            status=data.get('status', "pending")
+        )
+
+@dataclass
 class TrackState:
     """Independent parallel track state."""
     current_stage: str = ""
@@ -62,6 +84,8 @@ class TrackState:
     label: str = ""
     status: str = "in_progress"  # "in_progress" | "complete"
     created_at: str = ""
+    phase_id: Optional[str] = None   # PhaseNode ID (None = v1 manual track)
+    created_by: str = "manual"       # "manual" (v1) | "auto" (v2 DAG scheduler)
 
     def to_dict(self) -> Dict:
         return asdict(self)
@@ -84,7 +108,9 @@ class TrackState:
             checklist=items,
             label=data.get('label', ""),
             status=data.get('status', "in_progress"),
-            created_at=data.get('created_at', "")
+            created_at=data.get('created_at', ""),
+            phase_id=data.get('phase_id', None),
+            created_by=data.get('created_by', "manual")
         )
 
 @dataclass
@@ -96,6 +122,7 @@ class WorkflowState:
     checklist: List[CheckItem] = field(default_factory=list)
     tracks: Dict[str, TrackState] = field(default_factory=dict)
     active_track: Optional[str] = None
+    phase_graph: Dict[str, PhaseNode] = field(default_factory=dict)
 
     def to_dict(self) -> Dict:
         return asdict(self)
@@ -117,6 +144,10 @@ class WorkflowState:
         for tid, tdata in (data.get('tracks') or {}).items():
             tracks[tid] = TrackState.from_dict(tdata)
 
+        phase_graph = {}
+        for pid, pdata in (data.get('phase_graph') or {}).items():
+            phase_graph[pid] = PhaseNode.from_dict(pdata)
+
         return cls(
             current_milestone=data.get('current_milestone', ""),
             current_phase=data.get('current_phase', ""),
@@ -124,7 +155,8 @@ class WorkflowState:
             active_module=data.get('active_module', "unknown"),
             checklist=items,
             tracks=tracks,
-            active_track=data.get('active_track', None)
+            active_track=data.get('active_track', None),
+            phase_graph=phase_graph
         )
 
     def save(self, path: str):

@@ -308,6 +308,60 @@ def main():
         help=t('help.track.id')
     )
 
+    # Phase (subcommand group)
+    phase_parser = subparsers.add_parser(
+        "phase",
+        help=t('help.phase.description')
+    )
+    phase_subparsers = phase_parser.add_subparsers(dest="phase_command")
+
+    # phase add
+    phase_add_parser = phase_subparsers.add_parser(
+        "add",
+        help=t('help.phase.add')
+    )
+    phase_add_parser.add_argument(
+        "id",
+        help=t('help.phase.id')
+    )
+    phase_add_parser.add_argument(
+        "--label",
+        required=True,
+        help=t('help.phase.label')
+    )
+    phase_add_parser.add_argument(
+        "--module",
+        required=True,
+        help=t('help.phase.module')
+    )
+    phase_add_parser.add_argument(
+        "--depends-on",
+        default="",
+        help=t('help.phase.depends_on')
+    )
+
+    # phase list
+    phase_subparsers.add_parser(
+        "list",
+        help=t('help.phase.list')
+    )
+
+    # phase graph
+    phase_subparsers.add_parser(
+        "graph",
+        help=t('help.phase.graph')
+    )
+
+    # phase remove
+    phase_remove_parser = phase_subparsers.add_parser(
+        "remove",
+        help=t('help.phase.remove')
+    )
+    phase_remove_parser.add_argument(
+        "id",
+        help=t('help.phase.id')
+    )
+
     # Alias Install
     alias_parser = subparsers.add_parser(
         "install-alias",
@@ -490,6 +544,18 @@ def main():
                 print(ctrl.track_delete(args.id))
             else:
                 print(t('cli.track_usage'))
+        elif args.command == "phase":
+            if args.phase_command == "add":
+                depends_on = [d.strip() for d in args.depends_on.split(",") if d.strip()] if args.depends_on else []
+                print(ctrl.phase_add(args.id, label=args.label, module=args.module, depends_on=depends_on))
+            elif args.phase_command == "list":
+                print(ctrl.phase_list())
+            elif args.phase_command == "graph":
+                print(ctrl.phase_graph())
+            elif args.phase_command == "remove":
+                print(ctrl.phase_remove(args.id))
+            else:
+                print(t('cli.phase_usage'))
         else:
             parser.print_help()
 

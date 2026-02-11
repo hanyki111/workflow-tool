@@ -1,10 +1,10 @@
-"""Tests for parallel tracks feature (v1)."""
+"""Tests for parallel tracks feature (v1 + v2)."""
 import json
 import os
 import tempfile
 import pytest
 from unittest.mock import patch, MagicMock, PropertyMock
-from workflow.core.state import WorkflowState, TrackState, CheckItem
+from workflow.core.state import WorkflowState, TrackState, CheckItem, PhaseNode
 
 
 # ─── Phase 2.1: Data Model Tests ───
@@ -896,3 +896,196 @@ class TestCLITrackArgParsing:
         args = self._parse_args(["status"])
         assert args.track is None
         assert args.all_tracks is False
+
+
+# ─── Phase 3.1: PhaseNode Data Model + State Extension Tests ───
+
+
+class TestPhaseNode:
+    """PhaseNode dataclass tests."""
+
+    def test_construction_with_required_fields(self):
+        node = PhaseNode(id="1", label="Schema", module="core")
+        assert node.id == "1"
+        assert node.label == "Schema"
+        assert node.module == "core"
+        assert node.depends_on == []
+        assert node.status == "pending"
+
+    def test_construction_with_all_fields(self):
+        node = PhaseNode(
+            id="2", label="Parser", module="parser",
+            depends_on=["1"], status="active"
+        )
+        assert node.depends_on == ["1"]
+        assert node.status == "active"
+
+    def test_to_dict(self):
+        node = PhaseNode(id="1", label="A", module="m", depends_on=["0"], status="complete")
+        d = node.to_dict()
+        assert d == {
+            "id": "1", "label": "A", "module": "m",
+            "depends_on": ["0"], "status": "complete"
+        }
+
+    def test_from_dict_full(self):
+        data = {"id": "3", "label": "Engine", "module": "eng", "depends_on": ["1", "2"], "status": "active"}
+        node = PhaseNode.from_dict(data)
+        assert node.id == "3"
+        assert node.depends_on == ["1", "2"]
+        assert node.status == "active"
+
+    def test_from_dict_empty(self):
+        node = PhaseNode.from_dict({})
+        assert node.id == ""
+        assert node.label == ""
+        assert node.module == ""
+        assert node.depends_on == []
+        assert node.status == "pending"
+
+    def test_round_trip(self):
+        original = PhaseNode(id="5", label="CLI", module="cli", depends_on=["3", "4"], status="pending")
+        restored = PhaseNode.from_dict(original.to_dict())
+        assert restored == original
+
+    def test_equality(self):
+        a = PhaseNode(id="1", label="A", module="m")
+        b = PhaseNode(id="1", label="A", module="m")
+        assert a == b
+
+    def test_inequality(self):
+        a = PhaseNode(id="1", label="A", module="m")
+        b = PhaseNode(id="2", label="A", module="m")
+        assert a != b
+
+
+class TestWorkflowStatePhaseGraph:
+    """WorkflowState phase_graph field tests."""
+
+    def test_default_phase_graph_is_empty(self):
+        state = WorkflowState()
+        assert state.phase_graph == {}
+
+    def test_phase_graph_to_dict(self):
+        state = WorkflowState(
+            phase_graph={
+                "1": PhaseNode(id="1", label="A", module="m"),
+                "2": PhaseNode(id="2", label="B", module="m", depends_on=["1"]),
+            }
+        )
+        d = state.to_dict()
+        assert "phase_graph" in d
+        assert d["phase_graph"]["1"]["id"] == "1"
+        assert d["phase_graph"]["2"]["depends_on"] == ["1"]
+
+    def test_phase_graph_from_dict(self):
+        data = {
+            "phase_graph": {
+                "1": {"id": "1", "label": "A", "module": "m", "depends_on": [], "status": "complete"},
+                "2": {"id": "2", "label": "B", "module": "m", "depends_on": ["1"], "status": "pending"},
+            }
+        }
+        state = WorkflowState.from_dict(data)
+        assert len(state.phase_graph) == 2
+        assert isinstance(state.phase_graph["1"], PhaseNode)
+        assert state.phase_graph["1"].status == "complete"
+        assert state.phase_graph["2"].depends_on == ["1"]
+
+    def test_phase_graph_from_dict_missing(self):
+        """Backward compat: state.json without phase_graph."""
+        data = {"current_stage": "M0", "active_module": "test"}
+        state = WorkflowState.from_dict(data)
+        assert state.phase_graph == {}
+
+    def test_phase_graph_round_trip(self):
+        original = WorkflowState(
+            current_milestone="M3",
+            phase_graph={
+                "1": PhaseNode(id="1", label="X", module="a", depends_on=[], status="complete"),
+                "2": PhaseNode(id="2", label="Y", module="b", depends_on=["1"], status="active"),
+                "3": PhaseNode(id="3", label="Z", module="c", depends_on=["1"], status="pending"),
+            }
+        )
+        d = original.to_dict()
+        restored = WorkflowState.from_dict(d)
+        assert len(restored.phase_graph) == 3
+        assert restored.phase_graph["2"].depends_on == ["1"]
+        assert restored.phase_graph["3"].status == "pending"
+
+    def test_phase_graph_with_tracks_coexistence(self):
+        """v1 tracks and v2 phase_graph can coexist."""
+        state = WorkflowState(
+            tracks={"A": TrackState(label="Manual", phase_id=None, created_by="manual")},
+            phase_graph={"1": PhaseNode(id="1", label="Auto", module="m")},
+        )
+        d = state.to_dict()
+        restored = WorkflowState.from_dict(d)
+        assert len(restored.tracks) == 1
+        assert len(restored.phase_graph) == 1
+        assert restored.tracks["A"].created_by == "manual"
+
+    def test_save_load_round_trip_with_phase_graph(self):
+        """Full file persistence round-trip."""
+        state = WorkflowState(
+            current_milestone="M11",
+            phase_graph={
+                "1": PhaseNode(id="1", label="Init", module="core", status="complete"),
+                "2": PhaseNode(id="2", label="UI", module="viewer", depends_on=["1"], status="active"),
+            },
+            tracks={
+                "A": TrackState(label="Phase 2", phase_id="2", created_by="auto"),
+            }
+        )
+        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
+            path = f.name
+        try:
+            state.save(path)
+            loaded = WorkflowState.load(path)
+            assert len(loaded.phase_graph) == 2
+            assert loaded.phase_graph["2"].depends_on == ["1"]
+            assert loaded.tracks["A"].phase_id == "2"
+            assert loaded.tracks["A"].created_by == "auto"
+        finally:
+            os.remove(path)
+
+
+class TestTrackStateV2Extensions:
+    """TrackState v2 field extensions (phase_id, created_by)."""
+
+    def test_default_values(self):
+        track = TrackState()
+        assert track.phase_id is None
+        assert track.created_by == "manual"
+
+    def test_v2_fields(self):
+        track = TrackState(phase_id="3", created_by="auto")
+        assert track.phase_id == "3"
+        assert track.created_by == "auto"
+
+    def test_to_dict_includes_v2_fields(self):
+        track = TrackState(label="Test", phase_id="2", created_by="auto")
+        d = track.to_dict()
+        assert d["phase_id"] == "2"
+        assert d["created_by"] == "auto"
+
+    def test_from_dict_with_v2_fields(self):
+        data = {"label": "X", "phase_id": "5", "created_by": "auto"}
+        track = TrackState.from_dict(data)
+        assert track.phase_id == "5"
+        assert track.created_by == "auto"
+
+    def test_from_dict_without_v2_fields(self):
+        """Backward compat: v1 state.json without phase_id/created_by."""
+        data = {"label": "Old Track", "current_stage": "P4"}
+        track = TrackState.from_dict(data)
+        assert track.phase_id is None
+        assert track.created_by == "manual"
+
+    def test_round_trip(self):
+        original = TrackState(
+            current_stage="P3", active_module="eng",
+            label="Phase 2", phase_id="2", created_by="auto"
+        )
+        restored = TrackState.from_dict(original.to_dict())
+        assert restored.phase_id == original.phase_id
+        assert restored.created_by == original.created_by
