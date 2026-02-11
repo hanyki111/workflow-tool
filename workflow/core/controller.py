@@ -434,7 +434,7 @@ class WorkflowController:
         try:
             # Pre-register agent review if --agent flag provided
             if agent:
-                self.record_review(agent, f"Registered via check --agent")
+                self.record_review(agent, f"Registered via check --agent", track=effective_track)
                 results.append(t('controller.check.agent_registered', agent=agent))
 
             # Get stage config for action definitions
@@ -469,7 +469,7 @@ class WorkflowController:
 
                 # 2. Agent Verification Check
                 if required_agent:
-                    if not self._verify_agent_review(required_agent):
+                    if not self._verify_agent_review(required_agent, track=effective_track):
                         results.append(t('controller.check.agent_not_found', agent=required_agent))
                         continue
 
@@ -1629,31 +1629,44 @@ class WorkflowController:
         with open(path, "w", encoding="utf-8") as f:
             f.write(content)
 
-    def record_review(self, agent_name: str, summary: str):
-        """Records a sub-agent review event."""
-        self.audit.logger.log_event("AGENT_REVIEW", {
+    def record_review(self, agent_name: str, summary: str, track: Optional[str] = None):
+        """Records a sub-agent review event using effective (track-aware) stage."""
+        effective_track = self._resolve_track_id(track)
+        effective = self._get_effective_state(track)
+        stage = effective.current_stage
+        data = {
             "agent": agent_name,
-            "stage": self.state.current_stage,
+            "stage": stage,
             "module": self.context.data.get('active_module', 'unknown'),
             "summary": summary
-        })
-        return t('controller.review.recorded', agent=agent_name, stage=self.state.current_stage)
+        }
+        if effective_track:
+            data["track"] = effective_track
+        self.audit.logger.log_event("AGENT_REVIEW", data)
+        return t('controller.review.recorded', agent=agent_name, stage=stage)
 
-    def _verify_agent_review(self, agent_name: str) -> bool:
-        """Searches logs for recent AGENT_REVIEW event matching current stage."""
+    def _verify_agent_review(self, agent_name: str, track: Optional[str] = None) -> bool:
+        """Searches logs for recent AGENT_REVIEW event matching effective stage (and track)."""
+        effective_track = self._resolve_track_id(track)
+        effective = self._get_effective_state(track)
+        target_stage = effective.current_stage
         log_file = self.audit.logger.log_file
         if not os.path.exists(log_file):
             return False
-            
+
         try:
             with open(log_file, "r", encoding="utf-8") as f:
                 lines = f.readlines()
                 for line in reversed(lines):
                     log = json.loads(line)
-                    if log.get("event") == "AGENT_REVIEW" and \
-                       log.get("agent") == agent_name and \
-                       log.get("stage") == self.state.current_stage:
-                        return True
+                    if (log.get("event") == "AGENT_REVIEW"
+                            and log.get("agent") == agent_name
+                            and log.get("stage") == target_stage):
+                        if effective_track:
+                            if log.get("track") == effective_track:
+                                return True
+                        else:
+                            return True
         except Exception:
             pass
         return False

@@ -210,6 +210,10 @@ def main():
         required=True,
         help=t('help.review.summary')
     )
+    review_parser.add_argument(
+        "--track",
+        help=t('help.track.track_option')
+    )
 
     # Secret Generate
     subparsers.add_parser(
@@ -521,7 +525,7 @@ def main():
         elif args.command == "set":
             print(ctrl.set_stage(args.stage, module=args.module, force=args.force, token=args.token, track=args.track))
         elif args.command == "review":
-            print(ctrl.record_review(args.agent, args.summary))
+            print(ctrl.record_review(args.agent, args.summary, track=args.track))
         elif args.command == "secret-generate":
             generate_secret_interactive()
         elif args.command == "install-alias":

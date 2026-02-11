@@ -874,3 +874,93 @@ class TestPhaseTransitionNoHook(_PhaseTransitionBase):
             result = ctrl.next_stage(target="M4")
             state = WorkflowState.load(ctrl.config.state_file)
             assert state.current_stage == "M4"
+
+
+class TestAgentReviewTrackAware(_PhaseTransitionBase):
+    """Tests for TD-PAR-003: record_review / _verify_agent_review track awareness."""
+
+    def test_record_review_global_stage(self):
+        """record_review without track uses global stage."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            ctrl = self._make_controller(tmpdir, current_stage="P1")
+            result = ctrl.record_review("critic", "Test summary")
+            assert "P1" in result
+            # Verify audit log content
+            log_file = ctrl.audit.logger.log_file
+            with open(log_file, "r") as f:
+                lines = f.readlines()
+            log = json.loads(lines[-1])
+            assert log["event"] == "AGENT_REVIEW"
+            assert log["agent"] == "critic"
+            assert log["stage"] == "P1"
+            assert "track" not in log
+
+    def test_record_review_with_track(self):
+        """record_review with track uses track's stage and logs track_id."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tracks = {
+                "auto-feat": TrackState(
+                    current_stage="P7", active_module="feat",
+                    checklist=[], label="Feature", status="in_progress",
+                    created_at="2026-01-01", phase_id="feat", created_by="auto"
+                )
+            }
+            ctrl = self._make_controller(tmpdir, current_stage="P1", tracks=tracks,
+                                         active_track="auto-feat")
+            result = ctrl.record_review("critic", "Track review")
+            assert "P7" in result  # track's stage, not global P1
+            log_file = ctrl.audit.logger.log_file
+            with open(log_file, "r") as f:
+                lines = f.readlines()
+            log = json.loads(lines[-1])
+            assert log["stage"] == "P7"
+            assert log["track"] == "auto-feat"
+
+    def test_verify_review_global_stage(self):
+        """_verify_agent_review without track matches global stage."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            ctrl = self._make_controller(tmpdir, current_stage="P1")
+            ctrl.record_review("critic", "Summary")
+            assert ctrl._verify_agent_review("critic") is True
+            assert ctrl._verify_agent_review("other-agent") is False
+
+    def test_verify_review_with_track(self):
+        """_verify_agent_review with track matches track's stage + track_id."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tracks = {
+                "auto-feat": TrackState(
+                    current_stage="P7", active_module="feat",
+                    checklist=[], label="Feature", status="in_progress",
+                    created_at="2026-01-01", phase_id="feat", created_by="auto"
+                )
+            }
+            ctrl = self._make_controller(tmpdir, current_stage="P1", tracks=tracks)
+            # Record review for the track
+            ctrl.record_review("critic", "Track review", track="auto-feat")
+            # Verify with same track → True
+            assert ctrl._verify_agent_review("critic", track="auto-feat") is True
+            # Verify without track (global P1) → False (review was logged at P7)
+            assert ctrl._verify_agent_review("critic") is False
+
+    def test_verify_review_rejects_different_track_same_stage(self):
+        """Reviews from track A must NOT pass verification for track B at same stage."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tracks = {
+                "auto-A": TrackState(
+                    current_stage="P7", active_module="modA",
+                    checklist=[], label="A", status="in_progress",
+                    created_at="2026-01-01", phase_id="A", created_by="auto"
+                ),
+                "auto-B": TrackState(
+                    current_stage="P7", active_module="modB",
+                    checklist=[], label="B", status="in_progress",
+                    created_at="2026-01-01", phase_id="B", created_by="auto"
+                )
+            }
+            ctrl = self._make_controller(tmpdir, current_stage="P1", tracks=tracks)
+            # Record review only for track A
+            ctrl.record_review("critic", "Review A", track="auto-A")
+            # Track A → True
+            assert ctrl._verify_agent_review("critic", track="auto-A") is True
+            # Track B at same stage (P7) → False (different track_id)
+            assert ctrl._verify_agent_review("critic", track="auto-B") is False

@@ -182,10 +182,6 @@ commands:
     success: "Set stage to {stage}"
     invalid_stage: "Invalid stage: {stage}"
 
-  review:
-    success: "Recorded review from {agent}"
-    logged: "Review logged to audit file"
-
   secret:
     prompt: "Enter your secret phrase: "
     confirm: "Confirm secret phrase: "

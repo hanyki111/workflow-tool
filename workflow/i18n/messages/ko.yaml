@@ -182,10 +182,6 @@ commands:
     success: "스테이지를 {stage}로 설정"
     invalid_stage: "잘못된 스테이지: {stage}"
 
-  review:
-    success: "{agent}의 리뷰 기록 완료"
-    logged: "리뷰가 감사 파일에 기록됨"
-
   secret:
     prompt: "비밀 문구를 입력하세요: "
     confirm: "비밀 문구 확인: "
