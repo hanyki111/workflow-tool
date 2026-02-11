@@ -280,6 +280,7 @@ controller:
     success: "✅ 스테이지가 {stage}로 설정됨"
     success_forced: "⚠️ [강제] 스테이지가 {stage}로 설정됨"
     success_module: " (모듈: {module})"
+    dag_active_warning: "⚠️ DAG 자동 전이가 활성화되어 있습니다. '{stage}'(으)로의 직접 이동은 DAG 상태 불일치를 유발할 수 있습니다. `flow next`를 사용하세요. 강제: `flow set {stage} --force --token TOKEN`"
 
   module:
     name_required: "❌ 오류: 모듈 이름이 필요합니다."

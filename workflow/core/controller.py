@@ -1057,6 +1057,16 @@ class WorkflowController:
             from_stage = effective.current_stage
             effective.current_stage = transition.target
             effective.checklist = []
+
+            # Phase graph cleanup on cycle exit (e.g., P7 → M4)
+            # Depends on Phase 4.2 hook intercepting P7→P1 for auto-tracks
+            if (self.config.phase_cycle
+                    and self.state.phase_graph
+                    and from_stage == self.config.phase_cycle.end
+                    and transition.target != self.config.phase_cycle.start):
+                self.state.phase_graph = {}
+                self.state.current_phase = ""
+
             self.state.save(self.config.state_file)
             self.engine.set_stage(transition.target)
 
@@ -1106,6 +1116,13 @@ class WorkflowController:
                 return t('controller.set.force_token_required')
             if not verify_token(token):
                 return t('controller.set.force_invalid_token')
+
+        # DAG active warning: prevent direct jump to cycle start
+        if (self.config.phase_cycle
+                and self.state.phase_graph
+                and stage == self.config.phase_cycle.start
+                and not force):
+            return t('controller.set.dag_active_warning', stage=stage)
 
         # Check for unchecked items in current checklist
         unchecked = [i for i in effective.checklist if not i.checked]
@@ -1199,7 +1216,10 @@ class WorkflowController:
                     return False
             return True
         elif rule == 'all_phases_complete':
-            return True
+            if not self.state.phase_graph:
+                return True
+            from .scheduler import PhaseScheduler
+            return PhaseScheduler.is_all_complete(self.state.phase_graph)
         return None
 
     # ─── Track Management ───

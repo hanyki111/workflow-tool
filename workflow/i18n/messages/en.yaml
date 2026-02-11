@@ -280,6 +280,7 @@ controller:
     success: "✅ Stage set to {stage}"
     success_forced: "⚠️ [FORCED] Stage set to {stage}"
     success_module: " (module: {module})"
+    dag_active_warning: "⚠️ DAG auto-transition is active. Direct move to '{stage}' may cause DAG state inconsistency. Use `flow next` instead. Force: `flow set {stage} --force --token TOKEN`"
 
   module:
     name_required: "❌ Error: Module name is required."

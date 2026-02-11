@@ -2,7 +2,7 @@ import re
 import yaml
 from typing import List, Optional, Dict, Any
 from .state import CheckItem
-from .schema import WorkflowConfigV2, StageConfig, TransitionConfig, ConditionConfig, ChecklistItemConfig, RalphConfig, FileCheckConfig, PlatformActionConfig
+from .schema import WorkflowConfigV2, StageConfig, TransitionConfig, ConditionConfig, ChecklistItemConfig, RalphConfig, FileCheckConfig, PlatformActionConfig, PhaseCycleConfig
 
 class GuideParser:
     def __init__(self, content: str):
@@ -143,6 +143,15 @@ class ConfigParserV2:
         # guide_file is optional - only set if explicitly configured
         guide_file = data.get('guide_file', "")
 
+        # Parse phase_cycle (optional)
+        phase_cycle_data = data.get('phase_cycle')
+        phase_cycle = None
+        if phase_cycle_data:
+            phase_cycle = PhaseCycleConfig(
+                start=str(phase_cycle_data['start']),
+                end=str(phase_cycle_data['end'])
+            )
+
         config = WorkflowConfigV2(
             version=str(data.get('version', '1.0')),
             variables=data.get('variables', {}),
@@ -155,7 +164,8 @@ class ConfigParserV2:
             guide_file=guide_file,
             state_file=data.get('state_file', ".workflow/state.json"),
             secret_file=data.get('secret_file', ".workflow/secret"),
-            language=data.get('language', "")
+            language=data.get('language', ""),
+            phase_cycle=phase_cycle
         )
 
         # Validate Graph Integrity
@@ -170,10 +180,19 @@ class ConfigParserV2:
             for trans in stage.transitions:
                 if trans.target not in config.stages:
                     raise ValueError(f"Stage '{s_id}' has transition to non-existent stage '{trans.target}'")
-                
+
                 for cond in trans.conditions:
                     if cond.use_ruleset and cond.use_ruleset not in config.rulesets:
                         raise ValueError(f"Stage '{s_id}' references non-existent ruleset '{cond.use_ruleset}'")
+
+        # Validate phase_cycle references
+        if config.phase_cycle:
+            if config.phase_cycle.start not in config.stages:
+                raise ValueError(
+                    f"phase_cycle.start '{config.phase_cycle.start}' not found in stages")
+            if config.phase_cycle.end not in config.stages:
+                raise ValueError(
+                    f"phase_cycle.end '{config.phase_cycle.end}' not found in stages")
 
     @staticmethod
     def _parse_transition(data: Dict[str, Any]) -> TransitionConfig:

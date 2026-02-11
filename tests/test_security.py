@@ -57,6 +57,7 @@ class TestSetStageTokenValidation:
             config = MagicMock(spec=WorkflowConfigV2)
             config.stages = {"S1": MagicMock(), "S2": MagicMock()}
             config.state_file = os.path.join(tmpdir, "state.json")
+            config.phase_cycle = None
 
             # Create state with empty checklist
             state = MagicMock(spec=WorkflowState)
@@ -65,6 +66,7 @@ class TestSetStageTokenValidation:
             state.checklist = []  # Empty checklist - no unchecked items
             state.tracks = {}
             state.active_track = None
+            state.phase_graph = {}
 
             # Create mock controller
             ctrl = MagicMock(spec=WorkflowController)

@@ -62,6 +62,12 @@ class ChecklistItemConfig:
     ralph: Optional[RalphConfig] = None  # Ralph Loop configuration
 
 @dataclass
+class PhaseCycleConfig:
+    """Phase 사이클 경계 선언. DAG auto-transition의 전제 조건."""
+    start: str   # Phase 사이클 시작 stage ID (예: "P1")
+    end: str     # Phase 사이클 종료 stage ID (예: "P7")
+
+@dataclass
 class StageConfig:
     id: str
     label: str
@@ -89,3 +95,6 @@ class WorkflowConfigV2:
 
     # Language setting (persisted in workflow.yaml)
     language: str = ""  # Display language: "en", "ko", or "" for auto-detect
+
+    # Phase cycle configuration (optional, for DAG auto-transition)
+    phase_cycle: Optional[PhaseCycleConfig] = None
